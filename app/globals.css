@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+/* ───────────────────────── Design tokens ───────────────────────── */
+:root {
+  /* Table */
+  --table-bg: #0b3d2e;
+  --table-felt: #145a3e;
+  --table-spotlight: rgba(255, 220, 130, 0.06);
+
+  /* Card sizing */
+  --card-w-sm: 68px;
+  --card-h-sm: 96px;
+  --card-w-md: 90px;
+  --card-h-md: 126px;
+  --card-w-lg: 105px;
+  --card-h-lg: 147px;
+  --card-radius: 10px;
+
+  /* Card palette */
+  --card-face: #fffef8;
+  --card-border: rgba(0, 0, 0, 0.12);
+  --card-red: #dc2626;
+  --card-black: #1e293b;
+  --card-back-from: #312e81;
+  --card-back-to: #1e1b4b;
+  --card-back-accent: rgba(255, 255, 255, 0.07);
+
+  /* Selection / turn */
+  --glow-select: rgba(129, 140, 248, 0.6);
+  --glow-turn: rgba(251, 191, 36, 0.45);
+  --glow-cabo: rgba(245, 158, 11, 0.5);
+
+  /* Text overrides on dark table */
+  --foreground: #f1f5f9;
+  --foreground-muted: #94a3b8;
+  --background: var(--table-bg);
+
+  --font-sans: var(--font-pixel);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixel);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-pixel);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixel);
+}
+
+/* ───────────────────────── Base ───────────────────────── */
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: radial-gradient(
+      ellipse 80% 60% at 50% 45%,
+      var(--table-felt) 0%,
+      var(--table-bg) 100%
+    ),
+    var(--table-bg);
+  color: var(--foreground);
+  font-family: var(--font-pixel), "Courier New", monospace;
+  min-height: 100dvh;
+}
+
+/* Felt texture overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 50% 40% at 50% 48%, var(--table-spotlight), transparent 70%),
+    url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.75' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+}
+
+/* ───────────────────────── Card shadows ───────────────────────── */
+.card-shadow {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.25),
+    0 6px 16px rgba(0, 0, 0, 0.18),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.card-shadow-hover {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+/* Interactive cards: hover lift + shadow upgrade */
+.card-interactive {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.card-interactive:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+/* ───────────────────────── Card back pattern ───────────────────────── */
+.card-back-pattern {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      var(--card-back-accent) 0px,
+      var(--card-back-accent) 1px,
+      transparent 1px,
+      transparent 8px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      var(--card-back-accent) 0px,
+      var(--card-back-accent) 1px,
+      transparent 1px,
+      transparent 8px
+    ),
+    linear-gradient(160deg, var(--card-back-from), var(--card-back-to));
+}
+
+/* ───────────────────────── Glassmorphism panels ───────────────────────── */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ───────────────────────── Keyframes ───────────────────────── */
+@keyframes turn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--glow-turn); }
+  50% { box-shadow: 0 0 18px 4px var(--glow-turn); }
+}
+
+@keyframes card-deal {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.85) rotate(-4deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float-subtle {
+  0%,  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes card-glow {
+  0% { box-shadow: 0 0 15px 4px rgba(245, 158, 11, 0.6); transform: scale(1); }
+  50% { box-shadow: 0 0 35px 12px rgba(245, 158, 11, 1); transform: scale(1.08); }
+  100% { box-shadow: 0 0 15px 4px rgba(245, 158, 11, 0.6); transform: scale(1); }
+}
+
+.animate-card-glow {
+  animation: card-glow 0.8s ease-in-out infinite !important;
+  outline: 3px solid #f59e0b !important;
+  outline-offset: 2px !important;
+  z-index: 30 !important;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* ───────────────────────── Utility classes ───────────────────────── */
+.animate-turn-pulse {
+  animation: turn-pulse 2s ease-in-out infinite;
+}
+
+.animate-card-deal {
+  animation: card-deal 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+.animate-float {
+  animation: float-subtle 3s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* ───────────────────────── Mobile rotate hint ───────────────────────── */
+@keyframes rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+
+/* ───────────────── Portrait overlay (mobile only) ───────────────── */
+.portrait-overlay {
+  display: none;
+}
+
+@media (orientation: portrait) and (max-width: 768px) {
+  .portrait-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse 80% 60% at 50% 45%, #145a3e, #0b3d2e);
+  }
+}
