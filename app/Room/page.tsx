@@ -122,7 +122,7 @@ function RoomView() {
   }
 
   return (
-    <main className="relative flex h-full w-full flex-col items-center justify-center px-4 py-4 overflow-hidden">
+    <main className="relative flex min-h-full w-full flex-col items-center justify-center px-4 py-6 sm:py-10 my-auto">
       <DecoCards />
 
       {/* 3-2-1 Countdown Overlay */}
@@ -137,7 +137,7 @@ function RoomView() {
         </div>
       )}
 
-      <div className="w-full max-w-sm rounded-3xl border border-slate-700/60 bg-slate-900/85 p-6 sm:p-8 shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
+      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-slate-700/60 bg-slate-900/90 p-5 sm:p-8 my-auto shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
         <div className="text-center">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
             Room Code

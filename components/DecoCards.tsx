@@ -46,7 +46,7 @@ const DECO_CARDS = [
 
 export default function DecoCards() {
   return (
-    <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none hidden md:block">
       {DECO_CARDS.map((card, i) => {
         const isRed = card.suit === "♥" || card.suit === "♦";
         const textColor = isRed ? "#dc2626" : "#1e293b";

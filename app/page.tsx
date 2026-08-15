@@ -96,28 +96,28 @@ export default function Home() {
   }
 
   return (
-    <main className="relative flex h-full w-full items-center justify-center overflow-hidden px-4 py-4">
+    <main className="relative flex min-h-full w-full items-center justify-center px-4 py-6 sm:py-10 my-auto">
       <DecoCards />
 
       {/* Main card */}
       <div
-        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-700/60 bg-slate-900/85 p-6 sm:p-8 shadow-[0_8px_60px_rgba(0,0,0,0.5)] animate-card-deal"
+        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-700/60 bg-slate-900/90 p-5 sm:p-8 my-auto shadow-[0_8px_60px_rgba(0,0,0,0.5)] animate-card-deal"
         style={{ backdropFilter: "blur(20px)" }}
       >
         {/* Brand header */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-20 w-28 items-center justify-center rounded-2xl border border-slate-700/50 bg-slate-800/80 shadow-lg">
-            <div className="text-3xl leading-none flex items-center gap-1.5">
+        <div className="mb-4 sm:mb-8 text-center">
+          <div className="mx-auto mb-2 sm:mb-4 flex h-14 sm:h-20 w-20 sm:w-28 items-center justify-center rounded-2xl border border-slate-700/50 bg-slate-800/80 shadow-lg">
+            <div className="text-xl sm:text-3xl leading-none flex items-center gap-1.5">
               <span className="text-slate-300">♠</span>
               <span className="text-slate-400">♣</span>
               <span className="text-red-500">♥</span>
               <span className="text-red-400">♦</span>
             </div>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-widest text-white uppercase">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-widest text-white uppercase">
             CABO
           </h1>
-          <p className="mt-2 text-[11px] sm:text-xs font-medium text-slate-500 tracking-wide">
+          <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-slate-500 tracking-wide">
             Memory, tactics & rapid card swaps
           </p>
         </div>

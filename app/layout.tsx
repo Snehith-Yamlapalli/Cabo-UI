@@ -42,10 +42,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} ${cinzel.variable} h-full antialiased`}
     >
-      <body className="h-screen w-screen flex flex-col overflow-hidden">
+      <body className="h-full w-full min-h-screen flex flex-col overflow-x-hidden bg-slate-950">
         <LandscapeLock />
         <Header />
-        <div className="flex-1 w-full min-h-0 relative flex flex-col overflow-hidden">
+        <div className="flex-1 w-full min-h-0 relative flex flex-col overflow-y-auto">
           {children}
         </div>
         <Toaster position="top-center" />

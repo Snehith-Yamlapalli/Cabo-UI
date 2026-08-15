@@ -13,6 +13,7 @@ import {
   endTurn,
   callCabo,
   startGame,
+  toggleReady,
   stickyCard,
   giveCard,
   powerLook,
@@ -53,6 +54,7 @@ type GameActions = {
   onReplaceCard: (cardId: string) => void;
   onCallCabo: () => void;
   onStartNextRound: () => void;
+  onToggleReady: () => void;
   onToggleScorecard: () => void;
   onSticky: (cardId: string) => void;
   onGiveCard: (cardId: string) => void;
@@ -386,13 +388,43 @@ function CaboButton({ onClick, compact = false }: { onClick: () => void; compact
   );
 }
 
-function NextRoundButton({ onClick, compact = false }: { onClick: () => void; compact?: boolean }) {
+function NextRoundButton({
+  isAdmin,
+  isReady,
+  allNonAdminsReady,
+  onStart,
+  onToggleReady,
+  compact = false,
+}: {
+  isAdmin: boolean;
+  isReady: boolean;
+  allNonAdminsReady: boolean;
+  onStart: () => void;
+  onToggleReady: () => void;
+  compact?: boolean;
+}) {
+  if (isAdmin) {
+    return (
+      <button
+        onClick={onStart}
+        disabled={!allNonAdminsReady}
+        className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse`}
+      >
+        {!allNonAdminsReady ? "Waiting for Players..." : "Start Next Round →"}
+      </button>
+    );
+  }
+
   return (
     <button
-      onClick={onClick}
-      className={`${compact ? "px-3 py-1 text-[8px]" : "px-5 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 active:scale-95 transition-all animate-bounce`}
+      onClick={onToggleReady}
+      className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full transition-all hover:scale-105 active:scale-95 ${
+        isReady
+          ? "bg-slate-800 text-amber-400 border border-amber-500/50 shadow-lg"
+          : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 animate-bounce"
+      }`}
     >
-      Play Next Round &rarr;
+      {isReady ? "✓ Ready (Cancel)" : "Ready Up for Next Round!"}
     </button>
   );
 }
@@ -464,13 +496,22 @@ function GameOverBanner({ room }: { room: ApiRoomState }) {
 
 function ScorecardModal({
   room,
+  myId,
+  actions,
   onClose,
 }: {
   room: ApiRoomState;
+  myId: string | null;
+  actions: Record<string, any>;
   onClose: () => void;
 }) {
   const sortedPlayers = [...room.players].sort((a, b) => a.score - b.score);
   const leader = sortedPlayers[0];
+
+  const me = room.players.find((p) => p.id === myId);
+  const isAdmin = me?.is_admin ?? false;
+  const nonAdmins = room.players.filter((p) => !p.is_admin);
+  const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in">
@@ -521,6 +562,17 @@ function ScorecardModal({
                       Admin
                     </span>
                   )}
+                  {room.phase === "finished" && !p.is_admin && (
+                    <span
+                      className={`text-[8px] px-1.5 py-0.5 rounded-full uppercase font-bold ${
+                        p.is_ready
+                          ? "bg-emerald-500/80 text-white shadow-sm"
+                          : "bg-slate-700/80 text-slate-400"
+                      }`}
+                    >
+                      {p.is_ready ? "✓ Ready" : "Not Ready"}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {p.round_score !== undefined && room.phase === "finished" && (
@@ -565,6 +617,32 @@ function ScorecardModal({
             </div>
           </div>
         </div>
+
+        {/* Next Round Controls */}
+        {room.phase === "finished" && (
+          <div className="flex flex-col gap-2 pt-2 border-t border-slate-700/60">
+            {isAdmin ? (
+              <button
+                onClick={actions.onStartNextRound}
+                disabled={!allNonAdminsReady}
+                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black uppercase tracking-wider text-xs shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse"
+              >
+                {!allNonAdminsReady ? "Waiting for Players to Ready Up..." : "Start Next Round →"}
+              </button>
+            ) : (
+              <button
+                onClick={actions.onToggleReady}
+                className={`w-full py-3 px-4 rounded-2xl font-black uppercase tracking-wider text-xs transition-all hover:scale-[1.02] active:scale-95 ${
+                  me?.is_ready
+                    ? "bg-slate-800 text-amber-400 border border-amber-500/50 shadow-lg"
+                    : "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 hover:bg-emerald-500 animate-bounce"
+                }`}
+              >
+                {me?.is_ready ? "✓ Ready for Next Round (Cancel)" : "Ready Up for Next Round!"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -666,6 +744,10 @@ function MobileLayout({
   const seats = SEAT_ASSIGNMENTS[opponentCount] ?? SEAT_ASSIGNMENTS[5]!;
   const hasTopCenter = seats.includes("top-center");
 
+  const isAdmin = me?.is_admin ?? false;
+  const nonAdmins = room.players.filter((p) => !p.is_admin);
+  const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
+
   return (
     <main className="relative z-10 w-full h-[100dvh] overflow-hidden">
       <TableWatermark />
@@ -690,7 +772,14 @@ function MobileLayout({
           </p>
         </div>
         {room.phase === "finished" && (
-          <NextRoundButton onClick={actions.onStartNextRound} compact />
+          <NextRoundButton
+            isAdmin={isAdmin}
+            isReady={me?.is_ready ?? false}
+            allNonAdminsReady={allNonAdminsReady}
+            onStart={actions.onStartNextRound}
+            onToggleReady={actions.onToggleReady}
+            compact
+          />
         )}
         {me && actions.canCallCabo && (
           <CaboButton onClick={actions.onCallCabo} compact />
@@ -819,6 +908,10 @@ function DesktopLayout({
   const seats = SEAT_ASSIGNMENTS[opponentCount] ?? SEAT_ASSIGNMENTS[5]!;
   const hasTopCenter = seats.includes("top-center");
 
+  const isAdmin = me?.is_admin ?? false;
+  const nonAdmins = room.players.filter((p) => !p.is_admin);
+  const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
+
   return (
     <main className="relative z-10 w-full h-[100dvh] overflow-hidden flex justify-center">
       <TableWatermark />
@@ -843,7 +936,13 @@ function DesktopLayout({
           </p>
         </div>
         {room.phase === "finished" && (
-          <NextRoundButton onClick={actions.onStartNextRound} />
+          <NextRoundButton
+            isAdmin={isAdmin}
+            isReady={me?.is_ready ?? false}
+            allNonAdminsReady={allNonAdminsReady}
+            onStart={actions.onStartNextRound}
+            onToggleReady={actions.onToggleReady}
+          />
         )}
         {me && actions.canCallCabo && (
           <CaboButton onClick={actions.onCallCabo} />
@@ -1439,6 +1538,20 @@ function GameTable() {
       setBusy(false);
     },
 
+    onToggleReady: async () => {
+      if (!id || !myId || busy) return;
+      const rId = id;
+      const pId = myId;
+      setBusy(true);
+      try {
+        const mePlayer = room?.players.find((p) => p.id === pId);
+        await toggleReady(rId, pId, !mePlayer?.is_ready);
+      } catch (e) {
+        console.error("Toggle ready failed", e);
+      }
+      setBusy(false);
+    },
+
     onToggleScorecard: () => {
       setShowScorecard((prev) => !prev);
     },
@@ -1595,7 +1708,7 @@ function GameTable() {
       {room.phase === "peeking" && <PeekTimer endTime={room.peek_end_time} />}
       {room.phase === "cabo_round" && <CaboRoundBanner />}
       {room.phase === "finished" && <GameOverBanner room={room} />}
-      {showScorecard && <ScorecardModal room={room} onClose={() => setShowScorecard(false)} />}
+      {showScorecard && <ScorecardModal room={room} myId={myId} actions={actions} onClose={() => setShowScorecard(false)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       <RulesButton onClick={() => setShowRules(true)} />
       {isMobile ? <MobileLayout {...props} /> : <DesktopLayout {...props} />}
