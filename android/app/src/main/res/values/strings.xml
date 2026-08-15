@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Cabu</string>
-    <string name="title_activity_main">Cabu</string>
+    <string name="app_name">Cabo</string>
+    <string name="title_activity_main">Cabo</string>
     <string name="package_name">com.cabu.app</string>
     <string name="custom_url_scheme">com.cabu.app</string>
 </resources>

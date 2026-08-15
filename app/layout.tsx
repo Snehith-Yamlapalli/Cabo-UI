@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
+import { Geist, Geist_Mono, Press_Start_2P, Cinzel } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
 import LandscapeLock from "@/components/LandscapeLock";
@@ -21,9 +21,15 @@ const pixel = Press_Start_2P({
   subsets: ["latin"],
 });
 
+const cinzel = Cinzel({
+  variable: "--font-cinzel",
+  weight: ["900"],
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "Cabu",
-  description: "Create or join a room with Cabu",
+  title: "Cabo",
+  description: "Create or join a room with Cabo",
 };
 
 export default function RootLayout({
@@ -34,12 +40,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} ${cinzel.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="h-screen w-screen flex flex-col overflow-hidden">
         <LandscapeLock />
         <Header />
-        {children}
+        <div className="flex-1 w-full min-h-0 relative flex flex-col overflow-hidden">
+          {children}
+        </div>
         <Toaster position="top-center" />
       </body>
     </html>

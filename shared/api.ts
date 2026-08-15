@@ -10,6 +10,69 @@ import type {
 // Backend base URL. Override with NEXT_PUBLIC_API_URL in .env.local.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// WebSocket base URL. Derive from API_URL by replacing http(s) with ws(s).
+const WS_URL = API_URL.replace(/^http/, "ws");
+
+/**
+ * Connect a WebSocket to the game room for real-time state pushes.
+ * Returns a cleanup function that closes the socket and stops reconnection.
+ */
+export function connectGameSocket(
+  roomId: string,
+  callbacks: {
+    onState: (state: ApiRoomState) => void;
+    onRoomEnded: () => void;
+    onError?: (err: Event) => void;
+  },
+): () => void {
+  if (typeof window === "undefined") return () => {};
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let destroyed = false;
+
+  function connect() {
+    if (destroyed) return;
+    ws = new WebSocket(`${WS_URL}/ws/${roomId}`);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "room_ended") {
+          callbacks.onRoomEnded();
+          destroyed = true;
+          return;
+        }
+        callbacks.onState(data as ApiRoomState);
+      } catch (e) {
+        console.error("WS parse error", e);
+      }
+    };
+
+    ws.onclose = () => {
+      if (!destroyed) {
+        // Auto-reconnect after 1.5 seconds
+        reconnectTimer = setTimeout(connect, 1500);
+      }
+    };
+
+    ws.onerror = (e) => {
+      callbacks.onError?.(e);
+    };
+  }
+
+  connect();
+
+  // Return cleanup function
+  return () => {
+    destroyed = true;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (ws) {
+      ws.onclose = null; // Prevent reconnection on intentional close
+      ws.close();
+    }
+  };
+}
+
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: "POST",
@@ -17,7 +80,10 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    throw new Error(`Request failed (${res.status})`);
+    const errorData = await res.json().catch(() => ({}));
+    const err = new Error(errorData.detail || `Request failed (${res.status})`) as any;
+    err.status = res.status;
+    throw err;
   }
   return (await res.json()) as T;
 }
@@ -25,7 +91,10 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`);
   if (!res.ok) {
-    throw new Error(`Request failed (${res.status})`);
+    const errorData = await res.json().catch(() => ({}));
+    const err = new Error(errorData.detail || `Request failed (${res.status})`) as any;
+    err.status = res.status;
+    throw err;
   }
   return (await res.json()) as T;
 }
@@ -99,6 +168,18 @@ export function powerDiscard(roomId: string, playerId: string, cardId: string): 
   return postJson<ApiRoomState>("/game/power/discard", { room_id: roomId, player_id: playerId, card_id: cardId });
 }
 
+export function leaveRoom(roomId: string, playerId: string): Promise<any> {
+  return postJson("/room/leave", { room_id: roomId, player_id: playerId });
+}
+
+export function toggleReady(roomId: string, playerId: string, isReady?: boolean): Promise<any> {
+  return postJson("/room/ready", { room_id: roomId, player_id: playerId, is_ready: isReady });
+}
+
+export function destroyRoom(roomId: string): Promise<any> {
+  return fetch(`${API_URL}/room/${roomId}`, { method: "DELETE" }).then((res) => res.json());
+}
+
 // --- Local player cache ---------------------------------------------------
 // The backend only returns { responseCode, isAdmin }. We stash the player's
 // own name + admin flag (and the table size) so the lobby can render the
@@ -113,22 +194,30 @@ export function rememberPlayer(
   noOfPlayers?: number,
 ) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(playerKey(roomCode), JSON.stringify(player));
+  sessionStorage.setItem(playerKey(roomCode), JSON.stringify(player));
   if (noOfPlayers != null) {
-    localStorage.setItem(sizeKey(roomCode), String(noOfPlayers));
+    sessionStorage.setItem(sizeKey(roomCode), String(noOfPlayers));
   }
 }
 
 export function getRememberedPlayer(roomCode: string): Player | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(playerKey(roomCode));
+  const raw = sessionStorage.getItem(playerKey(roomCode));
   return raw ? (JSON.parse(raw) as Player) : null;
 }
 
 export function getRememberedSize(roomCode: string): number | null {
   if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem(sizeKey(roomCode));
+  const raw = sessionStorage.getItem(sizeKey(roomCode));
   return raw ? Number(raw) : null;
+}
+
+export function forgetPlayer(roomCode: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(playerKey(roomCode));
+  sessionStorage.removeItem(sizeKey(roomCode));
+  localStorage.removeItem(playerKey(roomCode));
+  localStorage.removeItem(sizeKey(roomCode));
 }
 
 // A stable per-device id so the backend can reconnect a player to their seat
@@ -146,4 +235,17 @@ export function getPlayerId(): string {
     localStorage.setItem(PLAYER_ID_KEY, id);
   }
   return id;
+}
+
+// ── Persistent player name (survives across rooms & sessions) ──
+const PLAYER_NAME_KEY = "cabu:playerName";
+
+export function getStoredName(): string {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(PLAYER_NAME_KEY) ?? "";
+}
+
+export function setStoredName(name: string) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(PLAYER_NAME_KEY, name.trim());
 }

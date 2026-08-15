@@ -1,4 +1,4 @@
-// Shared domain types for Cabu rooms.
+// Shared domain types for Cabo rooms.
 
 // Game-play types live under shared/game; re-export for a single import surface.
 export * from "./game/cards";
@@ -35,6 +35,7 @@ export type ApiPlayer = {
   score: number;
   round_score: number;
   is_admin: boolean;
+  is_ready?: boolean;
 };
 
 export type ApiStickyResolution = {
@@ -76,7 +77,8 @@ export type ApiRoomState = {
   };
   active_resolutions: ApiStickyResolution[];
   last_action_log?: string;
+  last_discard_was_sticky?: boolean;
 };
 
 export const MIN_PLAYERS = 3;
-export const MAX_PLAYERS = 8;
+export const MAX_PLAYERS = 6;

@@ -1,8 +1,10 @@
 "use client";
-import { Suspense, useCallback, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import DecoCards from "@/components/DecoCards";
 import {
   getRememberedPlayer,
+  connectGameSocket,
   getRoom,
   drawFromDeck,
   drawFromDiscard,
@@ -16,6 +18,9 @@ import {
   powerLook,
   powerSwap,
   powerDiscard,
+  leaveRoom,
+  destroyRoom,
+  forgetPlayer,
 } from "@/shared/api";
 import { suitSymbol } from "@/shared/game/cards";
 import type { ApiCard, ApiPlayer, ApiRoomState, ApiStickyResolution } from "@/shared/types";
@@ -26,7 +31,7 @@ function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     function check() {
-      setIsMobile(window.innerHeight < 500);
+      setIsMobile(window.innerHeight < 600 || window.innerWidth < 850);
     }
     check();
     window.addEventListener("resize", check);
@@ -54,6 +59,8 @@ type GameActions = {
   onPowerLook: (cardId: string) => void;
   onPowerSwap: (card1Id: string, card2Id: string) => void;
   onPowerDiscard: (cardId: string) => void;
+  onExitGame: () => void;
+  onEndGame: () => void;
 };
 
 /* ─────────────────────────── Card View ─────────────────────────── */
@@ -68,7 +75,7 @@ function CardView({
   isGlowing = false,
 }: {
   card: ApiCard | null;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   compact?: boolean;
   onClick?: () => void;
   clickable?: boolean;
@@ -77,19 +84,36 @@ function CardView({
 }) {
   const DIMS: Record<string, { w: number; h: number; corner: number; center: number }> = compact
     ? {
-        sm: { w: 40, h: 56, corner: 6, center: 14 },
-        md: { w: 56, h: 78, corner: 8, center: 18 },
-        lg: { w: 68, h: 96, corner: 10, center: 22 },
+        xs: { w: 32, h: 46, corner: 5, center: 12 },
+        sm: { w: 38, h: 54, corner: 6, center: 14 },
+        md: { w: 50, h: 70, corner: 8, center: 16 },
+        lg: { w: 62, h: 88, corner: 10, center: 20 },
       }
     : {
-        sm: { w: 56, h: 78, corner: 8, center: 18 },
-        md: { w: 80, h: 112, corner: 11, center: 26 },
-        lg: { w: 96, h: 134, corner: 13, center: 32 },
+        xs: { w: 38, h: 54, corner: 6, center: 14 },
+        sm: { w: 50, h: 70, corner: 8, center: 16 },
+        md: { w: 72, h: 100, corner: 10, center: 24 },
+        lg: { w: 88, h: 124, corner: 12, center: 28 },
       };
   const d = DIMS[size] ?? DIMS.md;
   const radius = compact ? 5 : 10;
   const cursorClass = clickable ? "cursor-pointer ring-2 ring-amber-400/70 hover:ring-amber-300 hover:scale-105 transition-transform" : "";
   const glowClass = isGlowing ? "animate-card-glow" : "";
+
+  const BADGE_DIMS: Record<string, { sizeClass: string; fontClass: string }> = compact
+    ? {
+        xs: { sizeClass: "w-2.5 h-2.5", fontClass: "text-[5.5px]" },
+        sm: { sizeClass: "w-3 h-3", fontClass: "text-[6.5px]" },
+        md: { sizeClass: "w-3.5 h-3.5", fontClass: "text-[7.5px]" },
+        lg: { sizeClass: "w-4 h-4", fontClass: "text-[8.5px]" },
+      }
+    : {
+        xs: { sizeClass: "w-3 h-3", fontClass: "text-[6.5px]" },
+        sm: { sizeClass: "w-3.5 h-3.5", fontClass: "text-[7.5px]" },
+        md: { sizeClass: "w-4 h-4", fontClass: "text-[8.5px]" },
+        lg: { sizeClass: "w-4.5 h-4.5", fontClass: "text-[9.5px]" },
+      };
+  const badge = BADGE_DIMS[size] ?? BADGE_DIMS.md;
 
   if (!card) {
     return (
@@ -99,7 +123,7 @@ function CardView({
         onClick={clickable ? onClick : undefined}
       >
         {index !== undefined && (
-          <div className="absolute -top-1 -right-1 bg-slate-900/90 text-white font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center shadow z-10 text-[7px] sm:text-[8px] border border-white/10">
+          <div className={`absolute -top-1 -right-1 bg-slate-900/90 text-white font-bold rounded-full ${badge.sizeClass} ${badge.fontClass} flex items-center justify-center shadow z-10 border border-white/10`}>
             {index + 1}
           </div>
         )}
@@ -128,7 +152,7 @@ function CardView({
       onClick={clickable ? onClick : undefined}
     >
       {index !== undefined && (
-        <div className="absolute -top-1 -right-1 bg-slate-900/90 text-white font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center shadow-lg z-10 text-[7px] sm:text-[8px] border border-white/10">
+        <div className={`absolute -top-1 -right-1 bg-slate-900/90 text-white font-bold rounded-full ${badge.sizeClass} ${badge.fontClass} flex items-center justify-center shadow-lg z-10 border border-white/10`}>
           {index + 1}
         </div>
       )}
@@ -180,7 +204,7 @@ function Hand({
   myId: string | null;
   isTurn: boolean;
   isYou: boolean;
-  cardSize?: "sm" | "md" | "lg";
+  cardSize?: "xs" | "sm" | "md" | "lg";
   compact?: boolean;
   layout?: "grid" | "row";
   onCardClick?: (cardId: string) => void;
@@ -199,13 +223,56 @@ function Hand({
   const gap = compact ? "gap-0.5" : "gap-1.5";
   const pad = compact ? "p-1" : "p-2 sm:p-3";
 
-  let colsClass = "grid-cols-2";
-  if (layout !== "row") {
-    const numCols = Math.max(2, Math.ceil(cards.length / 2));
-    if (numCols === 3) colsClass = "grid-cols-3";
-    else if (numCols === 4) colsClass = "grid-cols-4";
-    else if (numCols >= 5) colsClass = "grid-cols-5";
+  // Trim trailing nulls beyond 4 cards so 5th+ empty slots disappear when not in use
+  let effectiveCards = [...cards];
+  while (effectiveCards.length > 4 && effectiveCards[effectiveCards.length - 1] === null) {
+    effectiveCards.pop();
   }
+
+  // Determine grid column class and display order for horizontal expansion:
+  // 1-4 cards: 2 cols (1 2 / 3 4)
+  // 5-6 cards: 3 cols (1 2 5 / 3 4 6)
+  // 7-8 cards: 4 cols (1 2 5 7 / 3 4 6 8)
+  let colsClass = "grid-cols-2";
+  let displayItems: { card: ApiCard | null; origIndex: number }[] = [];
+
+  if (layout === "row") {
+    displayItems = effectiveCards.map((c, i) => ({ card: c, origIndex: i }));
+  } else {
+    if (effectiveCards.length <= 4) {
+      colsClass = "grid-cols-2";
+      displayItems = effectiveCards.map((c, i) => ({ card: c, origIndex: i }));
+    } else if (effectiveCards.length === 5) {
+      colsClass = "grid-cols-3";
+      // Order: 1 | 2 | 5 (top row) over 3 | 4 (bottom row) -> indices [0, 1, 4, 2, 3]
+      const order = [0, 1, 4, 2, 3];
+      displayItems = order
+        .filter((idx) => idx < effectiveCards.length)
+        .map((idx) => ({ card: effectiveCards[idx], origIndex: idx }));
+    } else if (effectiveCards.length === 6) {
+      colsClass = "grid-cols-3";
+      // Order: 1 | 2 | 5 (top row) over 3 | 4 | 6 (bottom row) -> indices [0, 1, 4, 2, 3, 5]
+      const order = [0, 1, 4, 2, 3, 5];
+      displayItems = order
+        .filter((idx) => idx < effectiveCards.length)
+        .map((idx) => ({ card: effectiveCards[idx], origIndex: idx }));
+    } else if (effectiveCards.length === 7) {
+      colsClass = "grid-cols-4";
+      // Order: 1 | 2 | 5 | 7 (top row) over 3 | 4 | 6 (bottom row) -> indices [0, 1, 4, 6, 2, 3, 5]
+      const order = [0, 1, 4, 6, 2, 3, 5];
+      displayItems = order
+        .filter((idx) => idx < effectiveCards.length)
+        .map((idx) => ({ card: effectiveCards[idx], origIndex: idx }));
+    } else {
+      colsClass = "grid-cols-4";
+      // Order: 1 | 2 | 5 | 7 (top row) over 3 | 4 | 6 | 8 (bottom row) -> indices [0, 1, 4, 6, 2, 3, 5, 7]
+      const order = [0, 1, 4, 6, 2, 3, 5, 7];
+      displayItems = order
+        .filter((idx) => idx < effectiveCards.length)
+        .map((idx) => ({ card: effectiveCards[idx], origIndex: idx }));
+    }
+  }
+
   const cardGrid = layout === "row" ? `flex ${gap}` : `grid ${colsClass} ${gap}`;
 
   const currentRoundSum = cards.reduce((sum, c) => sum + getCardValue(c), 0);
@@ -217,7 +284,7 @@ function Hand({
       } ${isDisconnected ? "opacity-50" : ""}`}
     >
       <div className={cardGrid}>
-        {cards.map((c, i) => {
+        {displayItems.map(({ card: c, origIndex: i }) => {
           if (c === null) {
             // Render an empty dashed slot matching exact card dimensions
             const DIMS: Record<string, { w: number; h: number }> = compact
@@ -227,20 +294,21 @@ function Hand({
 
             return (
               <div
-                key={i}
+                key={`empty-${i}`}
                 className="border-2 border-dashed border-slate-600/30 rounded-xl relative flex items-center justify-center opacity-50"
                 style={{ width: d.w, height: d.h, borderRadius: compact ? 5 : 10 }}
               >
                 <span className="text-slate-500 font-bold text-[9px] uppercase tracking-widest">Empty</span>
-                <div className="absolute -top-1 -right-1 bg-slate-800/80 text-slate-400 font-bold rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center text-[7px] sm:text-[8px] border border-white/5">
+                <div className={`absolute -top-1 -right-1 bg-slate-800/80 text-slate-400 font-bold rounded-full ${compact ? "w-2.5 h-2.5 text-[5.5px]" : "w-3.5 h-3.5 text-[7.5px]"} flex items-center justify-center border border-white/5`}>
                   {i + 1}
                 </div>
               </div>
             );
           }
 
-          const isRevealed = c.reveal_end_time ? c.reveal_end_time > now : false;
-          const faceUp = isFinished || (myId ? c.visible_to.includes(myId) : false) || isRevealed;
+          const isTimedReveal = Boolean(c.reveal_end_time);
+          const isRevealActive = isTimedReveal ? (c.reveal_end_time! > now) : true;
+          const faceUp = isFinished || (Boolean(myId && c.visible_to.includes(myId)) && isRevealActive);
 
           return (
             <CardView
@@ -337,6 +405,32 @@ function ScorecardButton({ onClick }: { onClick: () => void }) {
       title="Scorecard & Rules"
     >
       (i)
+    </button>
+  );
+}
+
+function ExitButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="glass-panel hover:bg-slate-800/80 text-slate-300 font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 border border-slate-600/50 shadow-lg hover:scale-105 active:scale-95 transition-all text-xs"
+      title="Exit Game"
+    >
+      <span className="text-xs">🚪</span>
+      <span className="hidden sm:inline">Exit</span>
+    </button>
+  );
+}
+
+function EndGameButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="glass-panel hover:bg-rose-900/80 text-rose-300 font-bold px-2.5 py-1 rounded-xl flex items-center gap-1 border border-rose-500/50 shadow-lg hover:scale-105 active:scale-95 transition-all text-xs animate-pulse"
+      title="End Game for Everyone"
+    >
+      <span className="text-xs">🛑</span>
+      <span className="hidden sm:inline">End Game</span>
     </button>
   );
 }
@@ -494,33 +588,56 @@ function PickedCardBadge({ card, room, myId, compact = false }: { card: ApiCard;
 
 /* ─────────────────────────── Seat Layout ─────────────────────────── */
 
-type SeatId = "top-left" | "top-center" | "top-right" | "mid-left" | "mid-right";
+type SeatId = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-right";
 
 const SEAT_STYLES: Record<SeatId, React.CSSProperties> = {
-  "top-left":   { position: "absolute", top: "4%",  left: "10%" },
-  "top-center": { position: "absolute", top: "2%",  left: "50%",  transform: "translateX(-50%)" },
-  "top-right":  { position: "absolute", top: "4%",  right: "10%" },
-  "mid-left":   { position: "absolute", top: "48%", left: "2%" },
-  "mid-right":  { position: "absolute", top: "48%", right: "2%" },
+  "top-left":     { position: "absolute", top: "14%", left: "14%" },
+  "top-center":   { position: "absolute", top: "1%",  left: "50%", transform: "translateX(-50%)" },
+  "top-right":    { position: "absolute", top: "14%", right: "14%" },
+  "bottom-left":  { position: "absolute", top: "58%", left: "4%" },
+  "bottom-right": { position: "absolute", top: "58%", right: "4%" },
 };
 
 const SEAT_ASSIGNMENTS: Record<number, SeatId[]> = {
-  1: ["mid-left"],
-  2: ["mid-left", "mid-right"],
-  3: ["mid-left", "top-left", "top-right"],
-  4: ["mid-left", "top-left", "top-right", "mid-right"],
-  5: ["mid-left", "top-left", "top-center", "top-right", "mid-right"],
+  1: ["top-center"],
+  2: ["top-left", "top-right"],
+  3: ["top-left", "top-center", "top-right"],
+  4: ["top-left", "top-right", "bottom-left", "bottom-right"],
+  5: ["top-left", "top-center", "top-right", "bottom-left", "bottom-right"],
 };
 
 /* ──────────────────── Mobile Layout ──────────────────── */
 
 const MOBILE_SEAT_STYLES: Record<SeatId, React.CSSProperties> = {
-  "top-left":   { position: "absolute", top: "4%",  left: "5%" },
-  "top-center": { position: "absolute", top: "2%",  left: "50%",  transform: "translateX(-50%)" },
-  "top-right":  { position: "absolute", top: "4%",  right: "5%" },
-  "mid-left":   { position: "absolute", top: "48%", left: "1%" },
-  "mid-right":  { position: "absolute", top: "48%", right: "1%" },
+  "top-left":     { position: "absolute", top: "12%", left: "14%" },
+  "top-center":   { position: "absolute", top: "1%",  left: "50%", transform: "translateX(-50%)" },
+  "top-right":    { position: "absolute", top: "12%", right: "14%" },
+  "bottom-left":  { position: "absolute", top: "56%", left: "2%" },
+  "bottom-right": { position: "absolute", top: "56%", right: "2%" },
 };
+
+function getDynamicSeatStyle(seatId: SeatId, cardCount: number, isMobile: boolean): React.CSSProperties {
+  const base = isMobile ? MOBILE_SEAT_STYLES[seatId] : SEAT_STYLES[seatId];
+  if (cardCount <= 4) return base;
+
+  // Gently adjust outward when penalty cards arrive
+  if (seatId === "top-left") return { ...base, left: "10%" };
+  if (seatId === "top-right") return { ...base, right: "10%" };
+  if (seatId === "bottom-left") return { ...base, left: "2%" };
+  if (seatId === "bottom-right") return { ...base, right: "2%" };
+
+  return base;
+}
+
+function TableWatermark() {
+  return (
+    <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+      <span className="text-[28vw] sm:text-[32vw] md:text-[380px] font-black tracking-[0.1em] text-white/[0.065] uppercase font-[family-name:var(--font-cinzel)] drop-shadow-md pl-[0.1em] leading-none text-center whitespace-nowrap">
+        CABO
+      </span>
+    </div>
+  );
+}
 
 function MobileLayout({
   others,
@@ -550,23 +667,28 @@ function MobileLayout({
   const hasTopCenter = seats.includes("top-center");
 
   return (
-    <main className="relative z-10 w-full h-[calc(100dvh-56px)] overflow-hidden">
-      {/* Top Left: Scorecard (i) Button */}
-      <div className="absolute top-1 left-2 z-30">
-        <ScorecardButton onClick={actions.onToggleScorecard} />
+    <main className="relative z-10 w-full h-[100dvh] overflow-hidden">
+      <TableWatermark />
+      {/* Top Left: Scorecard & Exit (Row 1) + End Game (Row 2 below Exit) */}
+      <div className="absolute top-1 left-2 z-30 flex flex-col items-start gap-1">
+        <div className="flex items-center gap-1.5">
+          <ScorecardButton onClick={actions.onToggleScorecard} />
+          <ExitButton onClick={actions.onExitGame} />
+        </div>
+        {me?.is_admin && (
+          <div className="pl-[26px]">
+            <EndGameButton onClick={actions.onEndGame} />
+          </div>
+        )}
       </div>
 
-      {/* Room badge centered in header */}
-      <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20">
-        <div className="glass-panel px-2.5 py-0.5 rounded-full border border-slate-700/50">
-          <p className="text-center text-[7px] uppercase tracking-wider text-slate-300">
+      {/* Top Right: Room Badge (Row 1) + Call Cabo / Next Round (Row 2 below Room Badge) */}
+      <div className="absolute top-1 right-2 z-40 flex flex-col items-end gap-1">
+        <div className="glass-panel px-2 py-0.5 rounded-lg border border-slate-600/50 shadow">
+          <p className="text-right text-[8px] font-bold uppercase tracking-wider text-slate-300">
             Room {room.room_id} · R{room.round_number ?? 1}
           </p>
         </div>
-      </div>
-
-      {/* Top Right: Next Round / Call Cabo Button */}
-      <div className="absolute top-1 right-2 z-40 flex flex-col items-end gap-2">
         {room.phase === "finished" && (
           <NextRoundButton onClick={actions.onStartNextRound} compact />
         )}
@@ -578,8 +700,8 @@ function MobileLayout({
       {/* Opponents in their seats */}
       {others.map((p, i) => {
         const seatId = seats[i];
-        if (!seatId) return null;
-        const style = MOBILE_SEAT_STYLES[seatId];
+        const cards = room.hands[p.id] ?? [];
+        const style = getDynamicSeatStyle(seatId, cards.length, true);
         
         return (
           <div key={p.id} style={style} className="z-10">
@@ -589,7 +711,7 @@ function MobileLayout({
               myId={myId}
               isTurn={p.id === currentTurnId}
               isYou={false}
-              cardSize="sm"
+              cardSize="xs"
               compact
               layout="grid"
               cardsClickable={getCardClickable(false)}
@@ -603,12 +725,12 @@ function MobileLayout({
 
       {/* Center Zone Mat: Distinguished Grey Plate for Deck + Discard */}
       {room.phase !== "finished" && (
-        <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-500">
-          <div className="glass-panel bg-slate-900/80 border border-slate-700/60 shadow-xl rounded-2xl p-2 flex items-center gap-5">
+        <div className="absolute top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-500">
+          <div className="glass-panel bg-slate-900/80 border border-slate-700/60 shadow-xl rounded-2xl p-1.5 flex items-center gap-4">
             {/* Deck */}
             <div className="flex flex-col items-center gap-0.5">
               <div className="animate-float">
-                <CardView card={null} size="md" compact clickable={actions.canDraw} onClick={actions.onDrawDeck} />
+                <CardView card={null} size="sm" compact clickable={actions.canDraw} onClick={actions.onDrawDeck} />
               </div>
               <span className="text-[7px] font-bold uppercase tracking-wider text-slate-300">
                 Deck · {room.draw_pile.length}
@@ -625,11 +747,11 @@ function MobileLayout({
             {/* Discard */}
             <div className="flex flex-col items-center gap-0.5">
               {discardTop ? (
-                <CardView card={discardTop} size="md" compact clickable={actions.canDraw && room.discard_pile.length > 0} onClick={actions.onDrawDiscard} isGlowing={glowingCards[discardTop.id]} />
+                <CardView card={discardTop} size="sm" compact clickable={actions.canDraw && room.discard_pile.length > 0} onClick={actions.onDrawDiscard} isGlowing={glowingCards[discardTop.id]} />
               ) : (
                 <div
                   className="flex items-center justify-center border border-dashed border-slate-600/60 text-[6px] font-bold uppercase text-slate-500 rounded-lg"
-                  style={{ width: 56, height: 78 }}
+                  style={{ width: 38, height: 54 }}
                 >
                   Empty
                 </div>
@@ -651,7 +773,7 @@ function MobileLayout({
             myId={myId}
             isTurn={me.id === currentTurnId}
             isYou
-            cardSize="lg"
+            cardSize="sm"
             compact
             layout="grid"
             cardsClickable={getCardClickable(true)}
@@ -698,14 +820,28 @@ function DesktopLayout({
   const hasTopCenter = seats.includes("top-center");
 
   return (
-    <main className="relative z-10 w-full h-[calc(100dvh-64px)] overflow-hidden flex justify-center">
-      {/* Top Left: Scorecard (i) Button - anchored to the screen edge */}
-      <div className="absolute top-4 left-6 z-40">
-        <ScorecardButton onClick={actions.onToggleScorecard} />
+    <main className="relative z-10 w-full h-[100dvh] overflow-hidden flex justify-center">
+      <TableWatermark />
+      {/* Top Left: Scorecard & Exit (Row 1) + End Game (Row 2 below Exit) */}
+      <div className="absolute top-4 left-6 z-40 flex flex-col items-start gap-1.5">
+        <div className="flex items-center gap-2">
+          <ScorecardButton onClick={actions.onToggleScorecard} />
+          <ExitButton onClick={actions.onExitGame} />
+        </div>
+        {me?.is_admin && (
+          <div className="pl-[34px]">
+            <EndGameButton onClick={actions.onEndGame} />
+          </div>
+        )}
       </div>
 
-      {/* Top Right: Next Round / Call Cabo Button - anchored to the screen edge */}
-      <div className="absolute top-4 right-6 z-40 flex flex-col items-end gap-2">
+      {/* Top Right: Room Badge (Row 1) + Call Cabo / Next Round (Row 2 below Room Badge) */}
+      <div className="absolute top-4 right-6 z-40 flex flex-col items-end gap-1.5">
+        <div className="glass-panel px-3.5 py-1.5 rounded-xl border border-slate-600/50 shadow-lg flex items-center">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            Room {room.room_id} · Round {room.round_number ?? 1} · {room.phase}
+          </p>
+        </div>
         {room.phase === "finished" && (
           <NextRoundButton onClick={actions.onStartNextRound} />
         )}
@@ -714,23 +850,17 @@ function DesktopLayout({
         )}
       </div>
 
-      {/* Container constrained to max-w-5xl for tight, responsive laptop layout */}
-      <div className="relative w-full max-w-5xl h-full">
-        {/* Room Badge centered in header */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
-          <div className="glass-panel px-4 py-1 rounded-full border border-slate-700/50">
-            <p className="text-center text-[10px] font-semibold uppercase tracking-wider text-slate-300">
-              Room {room.room_id} · Round {room.round_number ?? 1} · {room.phase}
-            </p>
-          </div>
-        </div>
+      {/* Balanced table container max-w-[1350px] */}
+      <div className="relative w-full max-w-[1350px] h-full">
 
         {/* Opponents */}
         {others.map((p, i) => {
           const seatId = seats[i];
           if (!seatId) return null;
+          const cards = room.hands[p.id] ?? [];
+          const style = getDynamicSeatStyle(seatId, cards.length, false);
           return (
-            <div key={p.id} style={SEAT_STYLES[seatId]} className="z-10">
+            <div key={p.id} style={style} className="z-10">
               <Hand
                 player={p}
                 cards={room.hands[p.id] ?? []}
@@ -749,7 +879,7 @@ function DesktopLayout({
 
         {/* Center Zone Mat: Distinguished Grey Plate for Deck + Discard */}
         {room.phase !== "finished" && (
-          <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-500">
+          <div className="absolute top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-500">
             <div className="glass-panel bg-slate-900/85 border border-slate-700/60 shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-3xl px-6 py-3.5 flex items-center gap-8">
               {/* Deck */}
               <div className="flex flex-col items-center gap-1.5">
@@ -867,6 +997,130 @@ function ActionToast({ log }: { log?: string }) {
   );
 }
 
+function WarningToast({ message, onClose }: { message: string | null; onClose: () => void }) {
+  if (!message) return null;
+
+  return (
+    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] px-4 w-full max-w-sm">
+      <div className="bg-rose-950/95 backdrop-blur text-rose-200 px-4 py-3 rounded-2xl shadow-2xl shadow-rose-950/80 border border-rose-500/50 text-center text-xs sm:text-sm font-bold animate-bounce flex items-center justify-between gap-2">
+        <span>{message}</span>
+        <button
+          onClick={onClose}
+          className="text-rose-400 hover:text-white text-xs font-black px-1.5 py-0.5 rounded bg-rose-900/50 border border-rose-500/30"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RulesButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="fixed bottom-3 left-3 z-40 glass-panel bg-slate-900/90 hover:bg-slate-800 text-amber-400 font-black w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center border border-amber-500/50 shadow-xl hover:scale-110 active:scale-95 transition-all text-base sm:text-lg"
+      title="Game Rules & Powers Guide"
+    >
+      📖
+    </button>
+  );
+}
+
+function RulesModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-2 sm:p-4 animate-fade-in">
+      <div className="glass-panel w-full max-w-sm sm:max-w-lg p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-amber-500/50 shadow-2xl flex flex-col gap-2.5 sm:gap-4 text-slate-100 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center border-b border-slate-700/60 pb-2 sm:pb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-sm sm:text-xl">📜</span>
+            <div>
+              <h2 className="text-xs sm:text-base font-black text-amber-400 uppercase tracking-wider leading-none">
+                Game Rules & Powers Guide
+              </h2>
+              <p className="text-[8px] sm:text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
+                Cabo Card Powers & Sticky Mechanics
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-[10px] sm:text-xs"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Card Powers Section */}
+        <div className="space-y-1.5 sm:space-y-2">
+          <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
+            <span>🃏</span> Card Powers (When Drawn from Deck & Discarded)
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+              <span className="text-[10px] sm:text-xs font-bold text-emerald-400">1 – 6</span>
+              <p className="text-[9px] sm:text-[11px] text-slate-300">No Power (Numeric value only).</p>
+            </div>
+            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+              <span className="text-[10px] sm:text-xs font-bold text-purple-300">7 & 8</span>
+              <p className="text-[9px] sm:text-[11px] text-slate-300">Peek at one of your <strong className="text-white">own cards</strong> (5s).</p>
+            </div>
+            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+              <span className="text-[10px] sm:text-xs font-bold text-purple-300">9 & 10</span>
+              <p className="text-[9px] sm:text-[11px] text-slate-300">Peek at one <strong className="text-white">opponent's card</strong> (5s).</p>
+            </div>
+            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+              <span className="text-[10px] sm:text-xs font-bold text-amber-300">Jack (J)</span>
+              <p className="text-[9px] sm:text-[11px] text-slate-300">Blind swap <strong className="text-white">any 2 cards</strong> on the board.</p>
+            </div>
+            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+              <span className="text-[10px] sm:text-xs font-bold text-amber-300">Queen (Q)</span>
+              <p className="text-[9px] sm:text-[11px] text-slate-300">Peek at 1 card, then choose whether to <strong className="text-white">swap it</strong>.</p>
+            </div>
+            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
+              <span className="text-[10px] sm:text-xs font-bold text-rose-300">King (K)</span>
+              <p className="text-[9px] sm:text-[11px] text-slate-300"><strong className="text-white">Trash/Discard</strong> one of your own cards.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sticky Rules Section */}
+        <div className="space-y-1.5 sm:space-y-2 border-t border-slate-700/60 pt-2 sm:pt-3">
+          <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
+            <span>📌</span> Sticky Mechanics
+          </h3>
+          <div className="bg-slate-800/60 p-2 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-700/50 space-y-1 sm:space-y-2 text-[9px] sm:text-xs text-slate-300">
+            <p>
+              • If top Discard card matches a card in hand, click it to <strong className="text-amber-300">Sticky</strong> out of turn!
+            </p>
+            <p>
+              • <strong className="text-emerald-400">Successful Sticky:</strong> Card is discarded into pile.
+            </p>
+            <p>
+              • <strong className="text-rose-400">Failed Sticky:</strong> Draw a penalty card from deck!
+            </p>
+            <p>
+              • <strong className="text-indigo-300">Sticky Opponent's Card:</strong> <strong className="text-white">Give one of your cards to that opponent</strong> to fill their slot!
+            </p>
+            <p className="text-[8px] sm:text-[11px] text-slate-400 italic">
+              * Note: Sticky disabled if hand size &ge; 8.
+            </p>
+          </div>
+        </div>
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="w-full py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold border border-amber-500/40 text-[10px] sm:text-xs transition"
+        >
+          Close Rules
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────── Sticky Resolution Banner ─────────────────────────── */
 
 function StickyResolutionBanner({ resolution, players, myId }: { resolution: ApiStickyResolution; players: ApiPlayer[]; myId: string | null }) {
@@ -887,7 +1141,7 @@ function StickyResolutionBanner({ resolution, players, myId }: { resolution: Api
 
 /* ─────────────────────────── Power Banner ─────────────────────────── */
 
-function PowerBanner({ room, myId, powerTargets }: { room: ApiRoomState; myId: string | null; powerTargets: string[] }) {
+function PowerBanner({ room, myId, powerTargets, onSkip }: { room: ApiRoomState; myId: string | null; powerTargets: string[]; onSkip: () => void }) {
     if (!myId || room.current_turn !== room.players.findIndex(p => p.id === myId)) return null;
     const pa = room.turn.pending_action;
     if (!["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pa)) return null;
@@ -901,15 +1155,21 @@ function PowerBanner({ room, myId, powerTargets }: { room: ApiRoomState; myId: s
         else msg = "POWER (J): Select the other card to swap with!";
     }
     else if (pa === "look_and_swap") {
-        if (!room.turn.first_swap_target) msg = "POWER (Q): Select an opponent's card to peek at!";
-        else msg = "POWER (Q): Decide! Select one of your cards to swap it with.";
+        if (!room.turn.first_swap_target) msg = "POWER (Q): Select a card to peek at!";
+        else msg = "POWER (Q): Select the second card to swap with!";
     }
 
     return (
-    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-4 w-full max-w-sm">
-      <div className="bg-purple-900/90 backdrop-blur text-white px-4 py-3 rounded-2xl shadow-2xl shadow-purple-900/50 border border-purple-400 text-center text-sm font-bold animate-pulse">
+    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-4 w-full max-w-sm flex flex-col items-center gap-1.5">
+      <div className="bg-purple-900/90 backdrop-blur text-white px-4 py-2.5 rounded-2xl shadow-2xl shadow-purple-900/50 border border-purple-400 text-center text-sm font-bold animate-pulse">
         {msg}
       </div>
+      <button
+        onClick={onSkip}
+        className="glass-panel bg-purple-950/80 hover:bg-purple-900 text-purple-200 text-xs font-semibold px-3 py-1 rounded-xl border border-purple-400/50 shadow hover:scale-105 active:scale-95 transition-all pointer-events-auto"
+      >
+        ⏩ Skip Power
+      </button>
     </div>
     );
 }
@@ -924,34 +1184,52 @@ function GameTable() {
   const [room, setRoom] = useState<ApiRoomState | null>(null);
   const [busy, setBusy] = useState(false);
   const [showScorecard, setShowScorecard] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [powerTargets, setPowerTargets] = useState<string[]>([]);
+  const [stickyWarning, setStickyWarning] = useState<string | null>(null);
   
   const previousHands = useRef<Record<string, string[]>>({});
   const [glowingCards, setGlowingCards] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!id) return;
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const data = await getRoom(id);
-        if (!cancelled) setRoom(data);
-      } catch (err: any) {
-        if (err.message && err.message.includes("404")) {
-          alert("Room not found or the game has ended.");
-          window.location.href = "/";
-          return;
-        }
-        // transient error; next tick retries
-      }
+    if (room?.phase === "finished") {
+      setShowScorecard(true);
     }
+  }, [room?.phase]);
 
-    poll();
-    const timer = setInterval(poll, 2000);
+  useEffect(() => {
+    if (!id) return;
+    let isCancelled = false;
+
+    // 1. Initial REST fetch on mount so state renders with 0ms delay
+    getRoom(id)
+      .then((data) => {
+        if (!isCancelled) setRoom(data);
+      })
+      .catch((err) => {
+        const msg = (err?.message || "").toLowerCase();
+        if (err?.status === 404 || msg.includes("404") || msg.includes("not found") || msg.includes("closed")) {
+          alert(`Room ${id} ended`);
+          forgetPlayer(id);
+          window.location.href = "/";
+        }
+      });
+
+    // 2. Real-time WebSocket connection for live pushes
+    const cleanupWs = connectGameSocket(id, {
+      onState: (data) => {
+        if (!isCancelled) setRoom(data);
+      },
+      onRoomEnded: () => {
+        alert(`Room ${id} ended`);
+        forgetPlayer(id);
+        window.location.href = "/";
+      },
+    });
+
     return () => {
-      cancelled = true;
-      clearInterval(timer);
+      isCancelled = true;
+      cleanupWs();
     };
   }, [id]);
 
@@ -1003,13 +1281,7 @@ function GameTable() {
     }
   }, [room]);
 
-  /** Refresh room state immediately after an action. */
-  const refresh = useCallback(async () => {
-    try {
-      const data = await getRoom(id);
-      setRoom(data);
-    } catch { /* will catch up on next poll */ }
-  }, [id]);
+
 
   if (!id) {
     return (
@@ -1052,7 +1324,6 @@ function GameTable() {
       setBusy(true);
       try {
         await drawFromDeck(id, myId);
-        await refresh();
       } catch (e) { console.error("Draw deck failed", e); }
       setBusy(false);
     },
@@ -1062,7 +1333,6 @@ function GameTable() {
       setBusy(true);
       try {
         await drawFromDiscard(id, myId);
-        await refresh();
       } catch (e) { console.error("Draw discard failed", e); }
       setBusy(false);
     },
@@ -1075,7 +1345,6 @@ function GameTable() {
         if (res.turn.pending_action === "discard" || res.turn.pending_action === "none") {
           await endTurn(id, myId);
         }
-        await refresh();
       } catch (e) { console.error("Discard failed", e); }
       setBusy(false);
     },
@@ -1086,7 +1355,6 @@ function GameTable() {
       try {
         await replaceCard(id, myId, cardId);
         await endTurn(id, myId);
-        await refresh();
       } catch (e) { console.error("Replace card failed", e); }
       setBusy(false);
     },
@@ -1096,20 +1364,17 @@ function GameTable() {
       setBusy(true);
       try {
         await callCabo(id, myId);
-        await refresh();
       } catch (e) { console.error("Call Cabo failed", e); }
       setBusy(false);
     },
 
     onSticky: async (cardId: string) => {
-      // Third-party sticky check is fine on backend. We only block local abuse for myHand.
-      // But actually if they sticky someone else's hand, they shouldn't be blocked by this.
-      // Let's just remove the frontend block for third party, or apply it to their OWN hand length.
       if (!myId) return;
       const myHand = room.hands[myId] ?? [];
       const validCardsCount = myHand.filter(c => c !== null).length;
       if (validCardsCount >= 8) {
-        console.warn("Cannot sticky with 8 or more cards");
+        setStickyWarning("⚠️ Cannot Sticky: Max Limit reached!");
+        setTimeout(() => setStickyWarning(null), 3500);
         return;
       }
       
@@ -1117,8 +1382,15 @@ function GameTable() {
       setBusy(true);
       try {
         await stickyCard(id, myId, cardId);
-        await refresh();
-      } catch (e) { console.error("Sticky failed", e); }
+      } catch (e: any) {
+        const msg = (e?.message || "").toLowerCase();
+        if (msg.includes("8") || msg.includes("cannot sticky")) {
+          setStickyWarning("⚠️ Cannot Sticky: Max Limit reached!");
+          setTimeout(() => setStickyWarning(null), 3500);
+        } else {
+          console.error("Sticky failed", e);
+        }
+      }
       setBusy(false);
     },
 
@@ -1127,7 +1399,6 @@ function GameTable() {
       setBusy(true);
       try {
         await giveCard(id, myId, cardId);
-        await refresh();
       } catch (e) { console.error("Give card failed", e); }
       setBusy(false);
     },
@@ -1137,7 +1408,6 @@ function GameTable() {
       setBusy(true);
       try {
         await powerLook(id, myId, cardId);
-        await refresh();
       } catch (e) { console.error("Power look failed", e); }
       setBusy(false);
     },
@@ -1147,7 +1417,6 @@ function GameTable() {
       setBusy(true);
       try {
         await powerSwap(id, myId, card1Id, card2Id);
-        await refresh();
       } catch (e) { console.error("Power swap failed", e); }
       setBusy(false);
     },
@@ -1157,7 +1426,6 @@ function GameTable() {
       setBusy(true);
       try {
         await powerDiscard(id, myId, cardId);
-        await refresh();
       } catch (e) { console.error("Power discard failed", e); }
       setBusy(false);
     },
@@ -1167,7 +1435,6 @@ function GameTable() {
       setBusy(true);
       try {
         await startGame(id);
-        await refresh();
       } catch (e) { console.error("Start next round failed", e); }
       setBusy(false);
     },
@@ -1175,9 +1442,41 @@ function GameTable() {
     onToggleScorecard: () => {
       setShowScorecard((prev) => !prev);
     },
+
+    onExitGame: async () => {
+      if (!id || !myId) return;
+      try {
+        await leaveRoom(id, myId);
+      } catch (e) {
+        console.error("Exit game failed", e);
+      }
+      forgetPlayer(id);
+      window.location.href = "/";
+    },
+
+    onEndGame: async () => {
+      if (!id) return;
+      if (!window.confirm("Are you sure you want to end this game for everyone?")) return;
+      try {
+        await destroyRoom(id);
+      } catch (e) {
+        console.error("End game failed", e);
+      }
+      forgetPlayer(id);
+      alert(`Room ${id} ended`);
+      window.location.href = "/";
+    },
   };
 
   const handleCardClick = (cardId: string, isMyCard: boolean) => {
+    const getCardOwnerId = (targetCardId: string): string | null => {
+      if (!room) return null;
+      for (const [pId, hand] of Object.entries(room.hands)) {
+        if (hand.some((c) => c?.id === targetCardId)) return pId;
+      }
+      return null;
+    };
+
     const activeRes = room.active_resolutions?.[0];
     const isPowerActive = isMyTurn && ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pendingAction);
 
@@ -1195,24 +1494,49 @@ function GameTable() {
 
     // 3. Powers
     if (isPowerActive) {
+      // Check if clicked card matches discard top rank for immediate Sticky
+      const allCards = Object.values(room.hands).flat();
+      const clickedCardObj = allCards.find((c) => c?.id === cardId);
+      const canSticky = room.phase === "playing" && !activeRes && room.discard_pile.length > 0;
+      const matchesDiscard = discardTop && clickedCardObj && clickedCardObj.rank === discardTop.rank;
+
+      if (canSticky && matchesDiscard && !room.last_discard_was_sticky) {
+        actions.onSticky(cardId);
+        return;
+      }
+
       if (pendingAction === "look_self" && isMyCard) {
         actions.onPowerLook(cardId);
       } else if (pendingAction === "look_other" && !isMyCard) {
         actions.onPowerLook(cardId);
       } else if (pendingAction === "discard_self" && isMyCard) {
         actions.onPowerDiscard(cardId);
-      } else if (pendingAction === "blind_swap" && !isMyCard) {
+      } else if (pendingAction === "blind_swap") {
         if (powerTargets.length === 0) {
-            setPowerTargets([cardId]);
+          setPowerTargets([cardId]);
         } else {
-            actions.onPowerSwap(powerTargets[0], cardId);
-            setPowerTargets([]);
+          const owner1 = getCardOwnerId(powerTargets[0]);
+          const owner2 = getCardOwnerId(cardId);
+          if (owner1 && owner2 && owner1 === owner2) {
+            setStickyWarning("⚠️ Must swap cards between two DIFFERENT players!");
+            setTimeout(() => setStickyWarning(null), 3500);
+            return;
+          }
+          actions.onPowerSwap(powerTargets[0], cardId);
+          setPowerTargets([]);
         }
-      } else if (pendingAction === "look_and_swap" && !isMyCard) {
+      } else if (pendingAction === "look_and_swap") {
         if (!room.turn.first_swap_target) {
-            actions.onPowerLook(cardId);
+          actions.onPowerLook(cardId);
         } else {
-            actions.onPowerSwap(room.turn.first_swap_target, cardId);
+          const owner1 = getCardOwnerId(room.turn.first_swap_target);
+          const owner2 = getCardOwnerId(cardId);
+          if (owner1 && owner2 && owner1 === owner2) {
+            setStickyWarning("⚠️ Must swap cards between two DIFFERENT players!");
+            setTimeout(() => setStickyWarning(null), 3500);
+            return;
+          }
+          actions.onPowerSwap(room.turn.first_swap_target, cardId);
         }
       }
       return;
@@ -1235,8 +1559,8 @@ function GameTable() {
       if (pendingAction === "look_self") return isMyCard;
       if (pendingAction === "look_other") return !isMyCard;
       if (pendingAction === "discard_self") return isMyCard;
-      if (pendingAction === "blind_swap") return !isMyCard;
-      if (pendingAction === "look_and_swap") return !isMyCard;
+      if (pendingAction === "blind_swap") return true;
+      if (pendingAction === "look_and_swap") return true;
     }
 
     const canSticky = room.phase === "playing" && !activeRes && room.discard_pile.length > 0;
@@ -1256,7 +1580,15 @@ function GameTable() {
   return (
     <>
       <ActionToast log={room.last_action_log} />
-      <PowerBanner room={room} myId={myId} powerTargets={powerTargets} />
+      <WarningToast message={stickyWarning} onClose={() => setStickyWarning(null)} />
+      <PowerBanner room={room} myId={myId} powerTargets={powerTargets} onSkip={async () => {
+        if (!id || !myId || busy) return;
+        setBusy(true);
+        try {
+          await endTurn(id, myId);
+        } catch (e) { console.error("Skip power failed", e); }
+        setBusy(false);
+      }} />
       {room.active_resolutions?.length > 0 && (
         <StickyResolutionBanner resolution={room.active_resolutions[0]} players={room.players} myId={myId} />
       )}
@@ -1264,6 +1596,8 @@ function GameTable() {
       {room.phase === "cabo_round" && <CaboRoundBanner />}
       {room.phase === "finished" && <GameOverBanner room={room} />}
       {showScorecard && <ScorecardModal room={room} onClose={() => setShowScorecard(false)} />}
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      <RulesButton onClick={() => setShowRules(true)} />
       {isMobile ? <MobileLayout {...props} /> : <DesktopLayout {...props} />}
     </>
   );
