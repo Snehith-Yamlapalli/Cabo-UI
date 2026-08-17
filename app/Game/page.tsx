@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import DecoCards from "@/components/DecoCards";
+import RoomClosedModal from "@/components/RoomClosedModal";
 import {
   getRememberedPlayer,
   connectGameSocket,
@@ -285,47 +286,58 @@ function Hand({
         isTurn ? "animate-turn-pulse border border-amber-400/60" : "border border-transparent"
       } ${isDisconnected ? "opacity-50" : ""}`}
     >
-      <div className={cardGrid}>
-        {displayItems.map(({ card: c, origIndex: i }) => {
-          if (c === null) {
-            // Render an empty dashed slot matching exact card dimensions
-            const DIMS: Record<string, { w: number; h: number }> = compact
-              ? { sm: { w: 40, h: 56 }, md: { w: 56, h: 78 }, lg: { w: 68, h: 96 } }
-              : { sm: { w: 56, h: 78 }, md: { w: 80, h: 112 }, lg: { w: 96, h: 134 } };
-            const d = DIMS[cardSize] ?? DIMS.md;
+      {displayItems.length === 0 ? (
+        <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-center shadow-lg">
+          <p className="text-[8px] sm:text-[9px] font-extrabold text-amber-400 uppercase tracking-wider animate-pulse">
+            Joined Room
+          </p>
+          <p className="text-[7px] sm:text-[8px] text-slate-400 mt-0.5 font-medium">
+            Joins in Next Round
+          </p>
+        </div>
+      ) : (
+        <div className={cardGrid}>
+          {displayItems.map(({ card: c, origIndex: i }) => {
+            if (c === null) {
+              // Render an empty dashed slot matching exact card dimensions
+              const DIMS: Record<string, { w: number; h: number }> = compact
+                ? { sm: { w: 40, h: 56 }, md: { w: 56, h: 78 }, lg: { w: 68, h: 96 } }
+                : { sm: { w: 56, h: 78 }, md: { w: 80, h: 112 }, lg: { w: 96, h: 134 } };
+              const d = DIMS[cardSize] ?? DIMS.md;
+
+              return (
+                <div
+                  key={`empty-${i}`}
+                  className="border-2 border-dashed border-slate-600/30 rounded-xl relative flex items-center justify-center opacity-50"
+                  style={{ width: d.w, height: d.h, borderRadius: compact ? 5 : 10 }}
+                >
+                  <span className="text-slate-500 font-bold text-[9px] uppercase tracking-widest">Empty</span>
+                  <div className={`absolute -top-1 -right-1 bg-slate-800/80 text-slate-400 font-bold rounded-full ${compact ? "w-2.5 h-2.5 text-[5.5px]" : "w-3.5 h-3.5 text-[7.5px]"} flex items-center justify-center border border-white/5`}>
+                    {i + 1}
+                  </div>
+                </div>
+              );
+            }
+
+            const isTimedReveal = Boolean(c.reveal_end_time);
+            const isRevealActive = isTimedReveal ? (c.reveal_end_time! > now) : true;
+            const faceUp = isFinished || (Boolean(myId && c.visible_to.includes(myId)) && isRevealActive);
 
             return (
-              <div
-                key={`empty-${i}`}
-                className="border-2 border-dashed border-slate-600/30 rounded-xl relative flex items-center justify-center opacity-50"
-                style={{ width: d.w, height: d.h, borderRadius: compact ? 5 : 10 }}
-              >
-                <span className="text-slate-500 font-bold text-[9px] uppercase tracking-widest">Empty</span>
-                <div className={`absolute -top-1 -right-1 bg-slate-800/80 text-slate-400 font-bold rounded-full ${compact ? "w-2.5 h-2.5 text-[5.5px]" : "w-3.5 h-3.5 text-[7.5px]"} flex items-center justify-center border border-white/5`}>
-                  {i + 1}
-                </div>
-              </div>
+              <CardView
+                key={c.id}
+                card={faceUp ? c : null}
+                size={cardSize}
+                compact={compact}
+                clickable={cardsClickable}
+                onClick={() => onCardClick?.(c.id)}
+                index={i}
+                isGlowing={glowingCards[c.id]}
+              />
             );
-          }
-
-          const isTimedReveal = Boolean(c.reveal_end_time);
-          const isRevealActive = isTimedReveal ? (c.reveal_end_time! > now) : true;
-          const faceUp = isFinished || (Boolean(myId && c.visible_to.includes(myId)) && isRevealActive);
-
-          return (
-            <CardView
-              key={c.id}
-              card={faceUp ? c : null}
-              size={cardSize}
-              compact={compact}
-              clickable={cardsClickable}
-              onClick={() => onCardClick?.(c.id)}
-              index={i}
-              isGlowing={glowingCards[c.id]}
-            />
-          );
-        })}
-      </div>
+          })}
+        </div>
+      )}
 
       <div className="flex items-center justify-center flex-wrap gap-1">
         <span
@@ -508,7 +520,8 @@ function ScorecardModal({
   const sortedPlayers = [...room.players].sort((a, b) => a.score - b.score);
   const leader = sortedPlayers[0];
 
-  const me = room.players.find((p) => p.id === myId);
+  const myName = getRememberedPlayer(room.room_id)?.name ?? null;
+  const me = room.players.find((p) => (myId && String(p.id).toLowerCase() === String(myId).toLowerCase()) || (myName && p.name.trim().toLowerCase() === myName.trim().toLowerCase())) || null;
   const isAdmin = me?.is_admin ?? false;
   const nonAdmins = room.players.filter((p) => !p.is_admin);
   const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
@@ -1286,6 +1299,7 @@ function GameTable() {
   const [showRules, setShowRules] = useState(false);
   const [powerTargets, setPowerTargets] = useState<string[]>([]);
   const [stickyWarning, setStickyWarning] = useState<string | null>(null);
+  const [roomClosed, setRoomClosed] = useState(false);
   
   const previousHands = useRef<Record<string, string[]>>({});
   const [glowingCards, setGlowingCards] = useState<Record<string, boolean>>({});
@@ -1303,26 +1317,33 @@ function GameTable() {
     // 1. Initial REST fetch on mount so state renders with 0ms delay
     getRoom(id)
       .then((data) => {
-        if (!isCancelled) setRoom(data);
+        if (!isCancelled) {
+          if (data.phase === "lobby") {
+            window.location.href = `/Room?id=${encodeURIComponent(id)}`;
+            return;
+          }
+          setRoom(data);
+        }
       })
       .catch((err) => {
         const msg = (err?.message || "").toLowerCase();
         if (err?.status === 404 || msg.includes("404") || msg.includes("not found") || msg.includes("closed")) {
-          alert(`Room ${id} ended`);
-          forgetPlayer(id);
-          window.location.href = "/";
+          setRoomClosed(true);
         }
       });
 
     // 2. Real-time WebSocket connection for live pushes
     const cleanupWs = connectGameSocket(id, {
       onState: (data) => {
-        if (!isCancelled) setRoom(data);
+        if (isCancelled) return;
+        if (data.phase === "lobby") {
+          window.location.href = `/Room?id=${encodeURIComponent(id)}`;
+          return;
+        }
+        setRoom(data);
       },
       onRoomEnded: () => {
-        alert(`Room ${id} ended`);
-        forgetPlayer(id);
-        window.location.href = "/";
+        setRoomClosed(true);
       },
     });
 
@@ -1544,8 +1565,9 @@ function GameTable() {
       const pId = myId;
       setBusy(true);
       try {
-        const mePlayer = room?.players.find((p) => p.id === pId);
-        await toggleReady(rId, pId, !mePlayer?.is_ready);
+        const mePlayer = room?.players.find((p) => String(p.id).toLowerCase() === String(pId).toLowerCase()) || me;
+        const currentReady = mePlayer?.is_ready ?? false;
+        await toggleReady(rId, pId, !currentReady);
       } catch (e) {
         console.error("Toggle ready failed", e);
       }
@@ -1710,6 +1732,7 @@ function GameTable() {
       {room.phase === "finished" && <GameOverBanner room={room} />}
       {showScorecard && <ScorecardModal room={room} myId={myId} actions={actions} onClose={() => setShowScorecard(false)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {roomClosed && id && <RoomClosedModal id={id} />}
       <RulesButton onClick={() => setShowRules(true)} />
       {isMobile ? <MobileLayout {...props} /> : <DesktopLayout {...props} />}
     </>

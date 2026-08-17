@@ -23,7 +23,7 @@ export default function Home() {
   }, []);
 
   function saveName() {
-    const trimmed = playerName.trim();
+    const trimmed = playerName.trim().slice(0, 30);
     if (!trimmed) return;
     setStoredName(trimmed);
     setPlayerName(trimmed);
@@ -31,7 +31,7 @@ export default function Home() {
   }
 
   async function startGame(noOfPlayers: number) {
-    const name = playerName.trim();
+    const name = playerName.trim().slice(0, 30);
     if (!name) return;
     const res = await createRoom({ name, noOfPlayers, isAdmin: true });
     if (!res.room_id) {
@@ -71,9 +71,18 @@ export default function Home() {
     try {
       await joinRoom({ room_id: code, player_name: name });
       rememberPlayer(code, { name, admin: false });
-      router.push(`/Room?id=${encodeURIComponent(code)}`);
+      const room = await getRoom(code);
+      if (room && room.phase !== "lobby") {
+        router.push(`/Game?id=${encodeURIComponent(code)}`);
+      } else {
+        router.push(`/Room?id=${encodeURIComponent(code)}`);
+      }
     } catch (err: any) {
       const msg = (err?.message || "").toLowerCase();
+      if (msg.includes("full")) {
+        alert(`Room ${code} is full!`);
+        return;
+      }
       if (msg.includes("already in this room") || msg.includes("already taken") || msg.includes("name")) {
         const newName = window.prompt(`The name "${name}" is already taken in Room ${code}.\nPlease enter a different name:`);
         if (newName?.trim()) {
@@ -83,7 +92,12 @@ export default function Home() {
           try {
             await joinRoom({ room_id: code, player_name: cleanNew });
             rememberPlayer(code, { name: cleanNew, admin: false });
-            router.push(`/Room?id=${encodeURIComponent(code)}`);
+            const room = await getRoom(code);
+            if (room && room.phase !== "lobby") {
+              router.push(`/Game?id=${encodeURIComponent(code)}`);
+            } else {
+              router.push(`/Room?id=${encodeURIComponent(code)}`);
+            }
             return;
           } catch (retryErr: any) {
             alert(retryErr.message || "Failed to join room.");
@@ -91,7 +105,7 @@ export default function Home() {
         }
         return;
       }
-      alert(err.message || `Room ${code} has been closed`);
+      alert(err.message || `Room ${code} has been closed or does not exist`);
     }
   }
 
@@ -131,10 +145,11 @@ export default function Home() {
             <input
               autoFocus
               type="text"
+              maxLength={30}
               value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
+              onChange={(e) => setPlayerName(e.target.value.slice(0, 30))}
               onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
-              placeholder="Enter your name"
+              placeholder="Enter your name (max 30 chars)"
               className="w-full rounded-2xl border border-slate-700/70 bg-slate-950/80 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 placeholder:text-xs outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
             />
             <button

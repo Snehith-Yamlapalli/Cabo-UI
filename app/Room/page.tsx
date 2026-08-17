@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DecoCards from "@/components/DecoCards";
+import RoomClosedModal from "@/components/RoomClosedModal";
 import { getRememberedPlayer, connectGameSocket, getRoom, startGame, forgetPlayer, toggleReady } from "@/shared/api";
 import { MAX_PLAYERS, type ApiPlayer } from "@/shared/types";
 
@@ -13,6 +14,7 @@ function RoomView() {
   const [players, setPlayers] = useState<ApiPlayer[]>([]);
   const [noOfPlayers, setNoOfPlayers] = useState(MAX_PLAYERS);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [roomClosed, setRoomClosed] = useState(false);
 
   function triggerCountdown() {
     setCountdown((prev) => (prev === null ? 3 : prev));
@@ -42,15 +44,13 @@ function RoomView() {
         setPlayers(room.players);
         setNoOfPlayers(room.max_players);
         if (room.phase !== "lobby") {
-          triggerCountdown();
+          router.push(`/Game?id=${encodeURIComponent(id)}`);
         }
       })
       .catch((err) => {
         const msg = (err?.message || "").toLowerCase();
         if (err?.status === 404 || msg.includes("404") || msg.includes("not found") || msg.includes("closed")) {
-          alert(`Room ${id} ended`);
-          forgetPlayer(id);
-          router.push("/");
+          setRoomClosed(true);
         }
       });
 
@@ -61,13 +61,11 @@ function RoomView() {
         setPlayers(room.players);
         setNoOfPlayers(room.max_players);
         if (room.phase !== "lobby") {
-          triggerCountdown();
+          router.push(`/Game?id=${encodeURIComponent(id)}`);
         }
       },
       onRoomEnded: () => {
-        alert(`Room ${id} ended`);
-        forgetPlayer(id);
-        router.push("/");
+        setRoomClosed(true);
       },
     });
 
@@ -221,6 +219,7 @@ function RoomView() {
             {me?.is_ready ? "Cancel Ready" : "Ready Up!"}
           </button>
         )}
+        {roomClosed && <RoomClosedModal id={id} />}
       </div>
     </main>
   );

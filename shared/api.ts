@@ -247,5 +247,5 @@ export function getStoredName(): string {
 
 export function setStoredName(name: string) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(PLAYER_NAME_KEY, name.trim());
+  sessionStorage.setItem(PLAYER_NAME_KEY, name.trim().slice(0, 30));
 }
