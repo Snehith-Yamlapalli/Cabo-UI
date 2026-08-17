@@ -23,6 +23,11 @@ import {
   leaveRoom,
   destroyRoom,
   forgetPlayer,
+  getStoredName,
+  setStoredName,
+  rememberPlayer,
+  joinRoom,
+  getPlayerId,
 } from "@/shared/api";
 import { suitSymbol } from "@/shared/game/cards";
 import type { ApiCard, ApiPlayer, ApiRoomState, ApiStickyResolution } from "@/shared/types";
@@ -347,7 +352,7 @@ function Hand({
           {isYou ? "You" : player.name}
         </span>
         {player.is_admin && (
-          <span className="shrink-0 rounded-full bg-indigo-500/80 px-1 py-px text-[5px] uppercase tracking-wider text-white">
+          <span className="shrink-0 rounded-full bg-amber-600/80 px-1 py-px text-[5px] uppercase tracking-wider text-white">
             Admin
           </span>
         )}
@@ -357,7 +362,7 @@ function Hand({
           </span>
         )}
         {isTurn && !isFinished && (
-          <span className="shrink-0 rounded-full bg-emerald-500/80 px-1 py-px text-[5px] uppercase tracking-wider text-white">
+          <span className="shrink-0 rounded-full bg-amber-500/80 px-1 py-px text-[5px] uppercase tracking-wider text-white">
             Turn
           </span>
         )}
@@ -367,7 +372,7 @@ function Hand({
           </span>
         )}
         {isFinished && (
-          <span className="shrink-0 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[7px] sm:text-[9px] font-extrabold text-white shadow shadow-emerald-900/50 border border-emerald-300/40">
+          <span className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[7px] sm:text-[9px] font-extrabold text-white shadow shadow-amber-900/50 border border-amber-300/40">
             Round: {currentRoundSum} | Total: {player.score}
           </span>
         )}
@@ -420,7 +425,7 @@ function NextRoundButton({
       <button
         onClick={onStart}
         disabled={!allNonAdminsReady}
-        className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse`}
+        className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse`}
       >
         {!allNonAdminsReady ? "Waiting for Players..." : "Start Next Round →"}
       </button>
@@ -433,7 +438,7 @@ function NextRoundButton({
       className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full transition-all hover:scale-105 active:scale-95 ${
         isReady
           ? "bg-slate-800 text-amber-400 border border-amber-500/50 shadow-lg"
-          : "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 animate-bounce"
+          : "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 animate-bounce"
       }`}
     >
       {isReady ? "✓ Ready (Cancel)" : "Ready Up for Next Round!"}
@@ -497,8 +502,8 @@ function GameOverBanner({ room }: { room: ApiRoomState }) {
 
   return (
     <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3">
-      <div className="glass-panel px-4 py-1.5 rounded-full border border-emerald-500/60 bg-emerald-950/40 shadow-lg flex items-center gap-2">
-        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-400">
+      <div className="glass-panel px-4 py-1.5 rounded-full border border-amber-500/60 bg-amber-950/40 shadow-lg flex items-center gap-2">
+        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-amber-400">
           Round {room.round_number ?? 1} Finished! Leader: {winner ? `${winner.name} (${winner.score} pts)` : "N/A"}
         </span>
       </div>
@@ -534,7 +539,7 @@ function ScorecardModal({
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold text-amber-400">Score</span>
             <div>
-              <h2 className="text-base font-black text-amber-400 uppercase tracking-wider leading-none">
+              <h2 className="text-lg sm:text-xl font-black text-gold-metallic font-logo uppercase tracking-wider leading-none">
                 Match Scorecard
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
@@ -571,7 +576,7 @@ function ScorecardModal({
                     {p.name} {p.id === leader?.id ? "(Leader)" : ""}
                   </span>
                   {p.is_admin && (
-                    <span className="text-[7px] bg-indigo-500/80 px-1 py-px rounded-full uppercase text-white font-bold">
+                    <span className="text-[7px] bg-amber-600/80 px-1 py-px rounded-full uppercase text-white font-bold">
                       Admin
                     </span>
                   )}
@@ -579,7 +584,7 @@ function ScorecardModal({
                     <span
                       className={`text-[8px] px-1.5 py-0.5 rounded-full uppercase font-bold ${
                         p.is_ready
-                          ? "bg-emerald-500/80 text-white shadow-sm"
+                          ? "bg-amber-500/80 text-white shadow-sm"
                           : "bg-slate-700/80 text-slate-400"
                       }`}
                     >
@@ -593,7 +598,7 @@ function ScorecardModal({
                       (+{p.round_score})
                     </span>
                   )}
-                  <span className="text-sm font-black text-emerald-400">
+                  <span className="text-sm font-black text-amber-400">
                     {p.score} pts
                   </span>
                 </div>
@@ -610,23 +615,23 @@ function ScorecardModal({
           <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-300">
             <div className="bg-slate-800/40 px-2.5 py-1.5 rounded-lg border border-slate-700/40 flex justify-between">
               <span>Ace (A)</span>
-              <span className="font-bold text-emerald-400">1 pt</span>
+              <span className="font-bold text-amber-400">1 pt</span>
             </div>
             <div className="bg-slate-800/40 px-2.5 py-1.5 rounded-lg border border-slate-700/40 flex justify-between">
               <span>2 - 10</span>
-              <span className="font-bold text-emerald-400">Face Value</span>
+              <span className="font-bold text-amber-400">Face Value</span>
             </div>
             <div className="bg-slate-800/40 px-2.5 py-1.5 rounded-lg border border-slate-700/40 flex justify-between">
               <span>Jack (J)</span>
-              <span className="font-bold text-emerald-400">11 pts</span>
+              <span className="font-bold text-amber-400">11 pts</span>
             </div>
             <div className="bg-slate-800/40 px-2.5 py-1.5 rounded-lg border border-slate-700/40 flex justify-between">
               <span>Queen (Q)</span>
-              <span className="font-bold text-emerald-400">12 pts</span>
+              <span className="font-bold text-amber-400">12 pts</span>
             </div>
             <div className="bg-slate-800/40 px-2.5 py-1.5 rounded-lg border border-slate-700/40 flex justify-between col-span-2">
               <span>King (K)</span>
-              <span className="font-bold text-emerald-400">13 pts</span>
+              <span className="font-bold text-amber-400">13 pts</span>
             </div>
           </div>
         </div>
@@ -638,7 +643,7 @@ function ScorecardModal({
               <button
                 onClick={actions.onStartNextRound}
                 disabled={!allNonAdminsReady}
-                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-black uppercase tracking-wider text-xs shadow-lg shadow-emerald-500/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse"
+                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-black uppercase tracking-wider text-xs shadow-lg shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse"
               >
                 {!allNonAdminsReady ? "Waiting for Players to Ready Up..." : "Start Next Round →"}
               </button>
@@ -648,7 +653,7 @@ function ScorecardModal({
                 className={`w-full py-3 px-4 rounded-2xl font-black uppercase tracking-wider text-xs transition-all hover:scale-[1.02] active:scale-95 ${
                   me?.is_ready
                     ? "bg-slate-800 text-amber-400 border border-amber-500/50 shadow-lg"
-                    : "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 hover:bg-emerald-500 animate-bounce"
+                    : "bg-amber-600 text-slate-950 shadow-lg shadow-amber-900/40 hover:bg-amber-500 animate-bounce"
                 }`}
               >
                 {me?.is_ready ? "✓ Ready for Next Round (Cancel)" : "Ready Up for Next Round!"}
@@ -681,6 +686,8 @@ function PickedCardBadge({ card, room, myId, compact = false }: { card: ApiCard;
 
 type SeatId = "top-left" | "top-center" | "top-right" | "bottom-left" | "bottom-right";
 
+const ALL_OPPONENT_SEATS: SeatId[] = ["top-left", "top-center", "top-right", "bottom-left", "bottom-right"];
+
 const SEAT_STYLES: Record<SeatId, React.CSSProperties> = {
   "top-left":     { position: "absolute", top: "14%", left: "14%" },
   "top-center":   { position: "absolute", top: "1%",  left: "50%", transform: "translateX(-50%)" },
@@ -693,9 +700,70 @@ const SEAT_ASSIGNMENTS: Record<number, SeatId[]> = {
   1: ["top-center"],
   2: ["top-left", "top-right"],
   3: ["top-left", "top-center", "top-right"],
-  4: ["top-left", "top-right", "bottom-left", "bottom-right"],
+  4: ["top-left", "top-center", "top-right", "bottom-right"],
   5: ["top-left", "top-center", "top-right", "bottom-left", "bottom-right"],
 };
+
+type SeatedOpponent = {
+  player: ApiPlayer;
+  seatId: SeatId;
+  isSittingOut: boolean;
+};
+
+function calculateSeatedOpponents(room: ApiRoomState, myId: string | null): SeatedOpponent[] {
+  const allOtherPlayers = room.players.filter((p) => p.id !== myId);
+  if (allOtherPlayers.length === 0) return [];
+
+  const isActiveRound = room.phase === "peeking" || room.phase === "playing" || room.phase === "cabo_round";
+
+  if (!isActiveRound) {
+    const count = Math.min(allOtherPlayers.length, 5);
+    const seats = SEAT_ASSIGNMENTS[count] ?? SEAT_ASSIGNMENTS[5]!;
+    return allOtherPlayers.slice(0, 5).map((p, idx) => ({
+      player: p,
+      seatId: seats[idx],
+      isSittingOut: false,
+    }));
+  }
+
+  const playingOpponents = allOtherPlayers.filter(
+    (p) => room.hands[p.id] && room.hands[p.id].length > 0
+  );
+  const sittingOutOpponents = allOtherPlayers.filter(
+    (p) => !room.hands[p.id] || room.hands[p.id].length === 0
+  );
+
+  const activeList = playingOpponents.length > 0 ? playingOpponents : allOtherPlayers;
+  const waitingList = playingOpponents.length > 0 ? sittingOutOpponents : [];
+
+  const count = Math.min(activeList.length, 5);
+  const activeSeats = SEAT_ASSIGNMENTS[count] ?? SEAT_ASSIGNMENTS[5]!;
+
+  const result: SeatedOpponent[] = [];
+
+  activeList.forEach((p, idx) => {
+    if (idx < 5) {
+      result.push({
+        player: p,
+        seatId: activeSeats[idx],
+        isSittingOut: false,
+      });
+    }
+  });
+
+  const unusedSeats = ALL_OPPONENT_SEATS.filter((s) => !activeSeats.includes(s));
+  waitingList.forEach((p, idx) => {
+    if (idx < unusedSeats.length) {
+      result.push({
+        player: p,
+        seatId: unusedSeats[idx],
+        isSittingOut: true,
+      });
+    }
+  });
+
+  return result;
+}
 
 /* ──────────────────── Mobile Layout ──────────────────── */
 
@@ -723,7 +791,7 @@ function getDynamicSeatStyle(seatId: SeatId, cardCount: number, isMobile: boolea
 function TableWatermark() {
   return (
     <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-      <span className="text-[28vw] sm:text-[32vw] md:text-[380px] font-black tracking-[0.1em] text-white/[0.065] uppercase font-[family-name:var(--font-cinzel)] drop-shadow-md pl-[0.1em] leading-none text-center whitespace-nowrap">
+      <span className="text-[28vw] sm:text-[32vw] md:text-[380px] font-black tracking-[0.15em] text-gold-metallic opacity-[0.06] uppercase font-logo drop-shadow-2xl pl-[0.15em] leading-none text-center whitespace-nowrap">
         CABO
       </span>
     </div>
@@ -753,10 +821,7 @@ function MobileLayout({
   getCardClickable: (isMyCard: boolean) => boolean;
   glowingCards: Record<string, boolean>;
 }) {
-  const opponentCount = Math.min(others.length, 5);
-  const seats = SEAT_ASSIGNMENTS[opponentCount] ?? SEAT_ASSIGNMENTS[5]!;
-  const hasTopCenter = seats.includes("top-center");
-
+  const seatedOpponents = calculateSeatedOpponents(room, myId);
   const isAdmin = me?.is_admin ?? false;
   const nonAdmins = room.players.filter((p) => !p.is_admin);
   const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
@@ -800,8 +865,7 @@ function MobileLayout({
       </div>
 
       {/* Opponents in their seats */}
-      {others.map((p, i) => {
-        const seatId = seats[i];
+      {seatedOpponents.map(({ player: p, seatId }) => {
         const cards = room.hands[p.id] ?? [];
         const style = getDynamicSeatStyle(seatId, cards.length, true);
         
@@ -809,7 +873,7 @@ function MobileLayout({
           <div key={p.id} style={style} className="z-10">
             <Hand
               player={p}
-              cards={room.hands[p.id] ?? []}
+              cards={cards}
               myId={myId}
               isTurn={p.id === currentTurnId}
               isYou={false}
@@ -828,7 +892,7 @@ function MobileLayout({
       {/* Center Zone Mat: Distinguished Grey Plate for Deck + Discard */}
       {room.phase !== "finished" && (
         <div className="absolute top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-500">
-          <div className="glass-panel bg-slate-900/80 border border-slate-700/60 shadow-xl rounded-2xl p-1.5 flex items-center gap-4">
+          <div className="glass-panel bg-[#0d1528]/80 border border-amber-900/30 shadow-xl rounded-2xl p-1.5 flex items-center gap-4">
             {/* Deck */}
             <div className="flex flex-col items-center gap-0.5">
               <div className="animate-float">
@@ -917,10 +981,7 @@ function DesktopLayout({
   getCardClickable: (isMyCard: boolean) => boolean;
   glowingCards: Record<string, boolean>;
 }) {
-  const opponentCount = Math.min(others.length, 5);
-  const seats = SEAT_ASSIGNMENTS[opponentCount] ?? SEAT_ASSIGNMENTS[5]!;
-  const hasTopCenter = seats.includes("top-center");
-
+  const seatedOpponents = calculateSeatedOpponents(room, myId);
   const isAdmin = me?.is_admin ?? false;
   const nonAdmins = room.players.filter((p) => !p.is_admin);
   const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
@@ -966,8 +1027,7 @@ function DesktopLayout({
       <div className="relative w-full max-w-[1350px] h-full">
 
         {/* Opponents */}
-        {others.map((p, i) => {
-          const seatId = seats[i];
+        {seatedOpponents.map(({ player: p, seatId }) => {
           if (!seatId) return null;
           const cards = room.hands[p.id] ?? [];
           const style = getDynamicSeatStyle(seatId, cards.length, false);
@@ -975,7 +1035,7 @@ function DesktopLayout({
             <div key={p.id} style={style} className="z-10">
               <Hand
                 player={p}
-                cards={room.hands[p.id] ?? []}
+                cards={cards}
                 myId={myId}
                 isTurn={p.id === currentTurnId}
                 isYou={false}
@@ -992,7 +1052,7 @@ function DesktopLayout({
         {/* Center Zone Mat: Distinguished Grey Plate for Deck + Discard */}
         {room.phase !== "finished" && (
           <div className="absolute top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-500">
-            <div className="glass-panel bg-slate-900/85 border border-slate-700/60 shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-3xl px-6 py-3.5 flex items-center gap-8">
+            <div className="glass-panel bg-[#0d1528]/85 border border-amber-900/30 shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-3xl px-6 py-3.5 flex items-center gap-8">
               {/* Deck */}
               <div className="flex flex-col items-center gap-1.5">
                 <div className="animate-float">
@@ -1148,7 +1208,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span className="text-sm sm:text-xl">📜</span>
             <div>
-              <h2 className="text-xs sm:text-base font-black text-amber-400 uppercase tracking-wider leading-none">
+              <h2 className="text-sm sm:text-lg font-black text-gold-metallic font-logo uppercase tracking-wider leading-none">
                 Game Rules & Powers Guide
               </h2>
               <p className="text-[8px] sm:text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
@@ -1171,7 +1231,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
             <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-emerald-400">1 – 6</span>
+              <span className="text-[10px] sm:text-xs font-bold text-amber-400">1 – 6</span>
               <p className="text-[9px] sm:text-[11px] text-slate-300">No Power (Numeric value only).</p>
             </div>
             <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
@@ -1207,7 +1267,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
               • If top Discard card matches a card in hand, click it to <strong className="text-amber-300">Sticky</strong> out of turn!
             </p>
             <p>
-              • <strong className="text-emerald-400">Successful Sticky:</strong> Card is discarded into pile.
+              • <strong className="text-amber-400">Successful Sticky:</strong> Card is discarded into pile.
             </p>
             <p>
               • <strong className="text-rose-400">Failed Sticky:</strong> Draw a penalty card from deck!
@@ -1303,6 +1363,13 @@ function GameTable() {
   
   const previousHands = useRef<Record<string, string[]>>({});
   const [glowingCards, setGlowingCards] = useState<Record<string, boolean>>({});
+
+  const [spectateChoice, setSpectateChoice] = useState<"watch" | "join" | null>(null);
+  const [joinNameInput, setJoinNameInput] = useState("");
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [showEndGameModal, setShowEndGameModal] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     if (room?.phase === "finished") {
@@ -1401,8 +1468,6 @@ function GameTable() {
     }
   }, [room]);
 
-
-
   if (!id) {
     return (
       <Centered>
@@ -1419,8 +1484,14 @@ function GameTable() {
     );
   }
 
-  const myName = getRememberedPlayer(id)?.name ?? null;
-  const me = room.players.find((p) => p.name === myName) || null;
+  const remembered = getRememberedPlayer(id);
+  const myName = remembered?.name ?? getStoredName() ?? null;
+  const me =
+    room.players.find(
+      (p) =>
+        (remembered?.id && p.id === remembered.id) ||
+        (myName && p.name.trim().toLowerCase() === myName.trim().toLowerCase()),
+    ) || null;
   const myId = me?.id ?? null;
   const others = room.players.filter((p) => p.id !== myId);
   const currentTurnId = room.players[room.current_turn]?.id ?? null;
@@ -1428,6 +1499,35 @@ function GameTable() {
     room.discard_pile.length > 0
       ? room.discard_pile[room.discard_pile.length - 1]
       : null;
+
+  const isSittingOut = !!me && (!room.hands[me.id] || room.hands[me.id].length === 0);
+
+  async function handleJoinForNextRound(nameToUse?: string) {
+    const finalName = (nameToUse || getStoredName() || "").trim().slice(0, 30);
+    if (!finalName) {
+      setShowNameModal(true);
+      return;
+    }
+    setIsJoining(true);
+    setJoinError("");
+    try {
+      setStoredName(finalName);
+      const res: any = await joinRoom({ room_id: id, player_name: finalName });
+      rememberPlayer(id, { name: finalName, id: res.player_id }, room?.max_players);
+      setShowNameModal(false);
+      setSpectateChoice("join");
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes("400") || msg.includes("full") || msg.includes("capacity")) {
+        setJoinError("Room is full or capacity reached");
+      } else {
+        setJoinError(msg);
+      }
+      setShowNameModal(true);
+    } finally {
+      setIsJoining(false);
+    }
+  }
 
   const isMyTurn = myId !== null && myId === currentTurnId;
   const pendingAction = room.turn.pending_action;
@@ -1589,17 +1689,8 @@ function GameTable() {
       window.location.href = "/";
     },
 
-    onEndGame: async () => {
-      if (!id) return;
-      if (!window.confirm("Are you sure you want to end this game for everyone?")) return;
-      try {
-        await destroyRoom(id);
-      } catch (e) {
-        console.error("End game failed", e);
-      }
-      forgetPlayer(id);
-      alert(`Room ${id} ended`);
-      window.location.href = "/";
+    onEndGame: () => {
+      setShowEndGameModal(true);
     },
   };
 
@@ -1732,6 +1823,189 @@ function GameTable() {
       {room.phase === "finished" && <GameOverBanner room={room} />}
       {showScorecard && <ScorecardModal room={room} myId={myId} actions={actions} onClose={() => setShowScorecard(false)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      {/* Choice Modal for non-participants joining mid-game */}
+      {!me && spectateChoice === null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal text-center">
+            <span className="text-4xl">🎴</span>
+            <h2 className="mt-3 text-xl sm:text-2xl font-black tracking-wider text-gold-metallic font-logo">
+              Game in Progress
+            </h2>
+            <p className="mt-2 text-xs text-slate-300">
+              Room #{id} ({room.players.length}/{room.max_players} Players)
+            </p>
+
+            <div className="mt-6 space-y-3">
+              {room.players.length < room.max_players ? (
+                <button
+                  onClick={() => handleJoinForNextRound()}
+                  className="w-full rounded-2xl btn-gold-metallic py-3.5 px-4 text-xs font-extrabold uppercase tracking-wider transition hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>🎮 Play Next Round</span>
+                </button>
+              ) : (
+                <div className="rounded-2xl border border-amber-900/40 bg-amber-950/30 p-3 text-xs font-bold text-amber-300">
+                  Room is Full ({room.players.length}/{room.max_players})
+                </div>
+              )}
+
+              <button
+                onClick={() => setSpectateChoice("watch")}
+                className="w-full rounded-2xl border border-amber-500/40 bg-[#112240] py-3.5 px-4 text-xs font-extrabold uppercase tracking-wider text-amber-200 hover:bg-[#1a2f54] hover:text-white transition hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>👁️ Watch (Spectate)</span>
+              </button>
+
+              <button
+                onClick={() => (window.location.href = "/")}
+                className="w-full rounded-2xl border border-slate-700/60 bg-slate-900/80 py-3 text-xs font-bold text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition cursor-pointer"
+              >
+                🚪 Exit Room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Name Input Modal if user clicked Play Next Round but has no stored name */}
+      {showNameModal && !me && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal">
+            <div className="text-center mb-6">
+              <span className="text-3xl">🃏</span>
+              <h2 className="mt-2 text-xl font-black tracking-wider text-gold-metallic font-logo">
+                Enter Your Name
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                Join Room #{id} for the Next Round
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <input
+                autoFocus
+                type="text"
+                maxLength={30}
+                value={joinNameInput}
+                onChange={(e) => setJoinNameInput(e.target.value.slice(0, 30))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleJoinForNextRound(joinNameInput);
+                }}
+                placeholder="Enter your name (max 30 chars)"
+                className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+              />
+
+              {joinError && (
+                <p className="text-xs font-semibold text-rose-400 bg-rose-950/50 p-2.5 rounded-xl border border-rose-900/50 text-center">
+                  {joinError}
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowNameModal(false)}
+                  className="flex-1 py-3 rounded-2xl border border-slate-700 bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleJoinForNextRound(joinNameInput)}
+                  disabled={!joinNameInput.trim() || isJoining}
+                  className="flex-1 rounded-2xl btn-gold-metallic py-3 text-xs font-extrabold uppercase tracking-wider transition disabled:opacity-40 cursor-pointer"
+                >
+                  {isJoining ? "Joining..." : "Join Game"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin End Game Confirmation Modal */}
+      {showEndGameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal text-center border border-rose-900/40">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-950/60 border border-rose-600/40 flex items-center justify-center text-3xl shadow-lg">
+              👑
+            </div>
+
+            <h2 className="mt-4 text-xl sm:text-2xl font-black tracking-wider text-rose-400 font-logo">
+              End Game for Everyone?
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-slate-300">
+              As Room Admin, ending <strong className="text-amber-400">Room #{id}</strong> will terminate the match for all connected players and return everyone to the main menu.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2.5">
+              <button
+                onClick={async () => {
+                  if (!id) return;
+                  try {
+                    await destroyRoom(id);
+                  } catch (e) {
+                    console.error("End game failed", e);
+                  }
+                  forgetPlayer(id);
+                  window.location.href = "/";
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-rose-700 hover:bg-rose-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-rose-950/50 transition hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>💀 Yes, End Game</span>
+              </button>
+
+              <button
+                onClick={() => setShowEndGameModal(false)}
+                className="w-full py-3 px-4 rounded-2xl border border-slate-700/60 bg-slate-900/80 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+              >
+                Cancel & Continue Playing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spectator Top Action Bar */}
+      {!me && spectateChoice === "watch" && (
+        <div className="fixed top-4 right-4 z-40">
+          <button
+            onClick={() => (window.location.href = "/")}
+            className="px-4 py-2.5 rounded-xl btn-gold-metallic text-xs font-extrabold uppercase tracking-wider shadow-xl flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>🚪 Exit Room</span>
+          </button>
+        </div>
+      )}
+
+      {/* Sitting Out Banner & Ready Button for Mid-Game Joiners */}
+      {me && isSittingOut && room.phase !== "finished" && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md rounded-2xl gold-card-border bg-[#0a162b]/95 p-4 text-center shadow-2xl backdrop-blur-md border border-amber-500/40">
+          <p className="text-xs font-extrabold text-gold-metallic font-logo uppercase tracking-wide">
+            You are Sitting Out this Round!
+          </p>
+          <p className="mt-1 text-[11px] text-slate-300">
+            Click <strong className="text-amber-400">Ready</strong> to join when the next round starts.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <button
+              onClick={actions.onToggleReady}
+              className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-extrabold uppercase tracking-wider transition ${
+                me.is_ready
+                  ? "bg-[#112240] text-amber-300 border border-amber-500/50 shadow"
+                  : "btn-gold-metallic animate-bounce"
+              }`}
+            >
+              {me.is_ready ? "✓ Ready for Next Round" : "Ready Up for Next Round!"}
+            </button>
+            <button
+              onClick={actions.onExitGame}
+              className="py-2.5 px-4 rounded-xl border border-slate-700 bg-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-700 cursor-pointer"
+            >
+              Exit Room
+            </button>
+          </div>
+        </div>
+      )}
+
       {roomClosed && id && <RoomClosedModal id={id} />}
       <RulesButton onClick={() => setShowRules(true)} />
       {isMobile ? <MobileLayout {...props} /> : <DesktopLayout {...props} />}

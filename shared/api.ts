@@ -190,32 +190,46 @@ const sizeKey = (roomCode: string) => `cabu:size:${roomCode}`;
 
 export function rememberPlayer(
   roomCode: string,
-  player: Player,
+  player: any,
   noOfPlayers?: number,
 ) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(playerKey(roomCode), JSON.stringify(player));
+  if (typeof window === "undefined" || !player) return;
+  const name = typeof player === "string" ? player : player.name || player.player_name || "";
+  const id = typeof player === "object" ? player.id || player.player_id || "" : "";
+  const admin = typeof player === "object" ? !!(player.admin || player.is_admin) : false;
+  if (!name) return;
+
+  const normalized: Player = { id, name, admin };
+  const str = JSON.stringify(normalized);
+  localStorage.setItem(playerKey(roomCode), str);
   if (noOfPlayers != null) {
-    sessionStorage.setItem(sizeKey(roomCode), String(noOfPlayers));
+    localStorage.setItem(sizeKey(roomCode), String(noOfPlayers));
   }
 }
 
 export function getRememberedPlayer(roomCode: string): Player | null {
   if (typeof window === "undefined") return null;
-  const raw = sessionStorage.getItem(playerKey(roomCode));
-  return raw ? (JSON.parse(raw) as Player) : null;
+  const raw = localStorage.getItem(playerKey(roomCode));
+  if (!raw || raw === "undefined" || raw === "null") return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !parsed.name) return null;
+    return parsed as Player;
+  } catch (e) {
+    return null;
+  }
 }
 
 export function getRememberedSize(roomCode: string): number | null {
   if (typeof window === "undefined") return null;
-  const raw = sessionStorage.getItem(sizeKey(roomCode));
-  return raw ? Number(raw) : null;
+  const raw = localStorage.getItem(sizeKey(roomCode));
+  if (!raw || raw === "undefined" || raw === "null") return null;
+  const num = Number(raw);
+  return isNaN(num) ? null : num;
 }
 
 export function forgetPlayer(roomCode: string) {
   if (typeof window === "undefined") return;
-  sessionStorage.removeItem(playerKey(roomCode));
-  sessionStorage.removeItem(sizeKey(roomCode));
   localStorage.removeItem(playerKey(roomCode));
   localStorage.removeItem(sizeKey(roomCode));
 }
@@ -242,10 +256,13 @@ const PLAYER_NAME_KEY = "cabu:playerName";
 
 export function getStoredName(): string {
   if (typeof window === "undefined") return "";
-  return sessionStorage.getItem(PLAYER_NAME_KEY) ?? "";
+  const raw = localStorage.getItem(PLAYER_NAME_KEY);
+  if (!raw || raw === "undefined" || raw === "null") return "";
+  return raw;
 }
 
 export function setStoredName(name: string) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(PLAYER_NAME_KEY, name.trim().slice(0, 30));
+  if (typeof window === "undefined" || !name) return;
+  const clean = name.trim().slice(0, 30);
+  localStorage.setItem(PLAYER_NAME_KEY, clean);
 }

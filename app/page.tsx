@@ -115,23 +115,25 @@ export default function Home() {
 
       {/* Main card */}
       <div
-        className="relative z-10 w-full max-w-md rounded-3xl border border-slate-700/60 bg-slate-900/90 p-5 sm:p-8 my-auto shadow-[0_8px_60px_rgba(0,0,0,0.5)] animate-card-deal"
-        style={{ backdropFilter: "blur(20px)" }}
+        className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-5 sm:p-8 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl animate-card-deal"
       >
         {/* Brand header */}
         <div className="mb-4 sm:mb-8 text-center">
-          <div className="mx-auto mb-2 sm:mb-4 flex h-14 sm:h-20 w-20 sm:w-28 items-center justify-center rounded-2xl border border-slate-700/50 bg-slate-800/80 shadow-lg">
+          <div className="mx-auto mb-2 sm:mb-4 flex h-14 sm:h-20 w-20 sm:w-28 items-center justify-center rounded-2xl border border-amber-500/30 bg-[#112240]/90 shadow-lg">
             <div className="text-xl sm:text-3xl leading-none flex items-center gap-1.5">
-              <span className="text-slate-300">♠</span>
-              <span className="text-slate-400">♣</span>
-              <span className="text-red-500">♥</span>
-              <span className="text-red-400">♦</span>
+              <span className="text-amber-400">♠</span>
+              <span className="text-amber-400">♣</span>
+              <span className="text-amber-400">♥</span>
+              <span className="text-amber-400">♦</span>
             </div>
           </div>
-          <h1 className="text-2xl sm:text-4xl font-black tracking-widest text-white uppercase">
+          <h1
+            className="text-4xl sm:text-6xl font-black tracking-[0.18em] text-gold-metallic font-logo uppercase drop-shadow-lg py-1"
+            style={{ fontFamily: "'Cinzel Decorative', serif" }}
+          >
             CABO
           </h1>
-          <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-slate-500 tracking-wide">
+          <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-slate-400 tracking-wide">
             Memory, tactics & rapid card swaps
           </p>
         </div>
@@ -139,7 +141,7 @@ export default function Home() {
         {/* Step 1: Name input (only if no name stored) */}
         {!nameReady ? (
           <div className="space-y-3">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
               What's your name?
             </label>
             <input
@@ -150,12 +152,12 @@ export default function Home() {
               onChange={(e) => setPlayerName(e.target.value.slice(0, 30))}
               onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
               placeholder="Enter your name (max 30 chars)"
-              className="w-full rounded-2xl border border-slate-700/70 bg-slate-950/80 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 placeholder:text-xs outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 placeholder:text-xs outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
             />
             <button
               onClick={saveName}
               disabled={!playerName.trim()}
-              className="w-full rounded-2xl bg-emerald-600 px-5 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-900/40 transition-all hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30"
+              className="w-full rounded-2xl btn-gold-metallic px-5 py-3.5 text-xs sm:text-sm font-extrabold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-30"
             >
               Continue
             </button>
@@ -164,18 +166,18 @@ export default function Home() {
           /* Step 2: Create / Join (name already set) */
           <div className="space-y-4">
             {/* Playing as Name Badge with Change Name action */}
-            <div className="glass-panel bg-slate-900/90 border border-slate-700/60 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xl">
+            <div className="glass-panel bg-[#0d1c33]/90 border border-amber-500/30 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xl">
               <div className="flex flex-col text-left">
                 <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
                   Playing as
                 </span>
-                <span className="text-base sm:text-lg font-black text-amber-400 tracking-wide truncate max-w-[170px] sm:max-w-[210px]">
+                <span className="text-base sm:text-lg font-black text-gold-metallic tracking-wide truncate max-w-[170px] sm:max-w-[210px]">
                   {playerName}
                 </span>
               </div>
               <button
                 onClick={() => setNameReady(false)}
-                className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600/60 text-slate-200 hover:text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow cursor-pointer"
+                className="shrink-0 px-3.5 py-2 rounded-xl bg-[#112240] hover:bg-[#1a2f54] border border-amber-500/30 text-amber-200 hover:text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow cursor-pointer"
                 title="Change Name"
               >
                 <span>Change</span>
@@ -185,7 +187,7 @@ export default function Home() {
 
             <button
               onClick={() => setShowCreate(true)}
-              className="w-full rounded-2xl bg-emerald-600 px-5 py-3.5 sm:py-4 text-xs sm:text-sm font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-900/40 transition-all hover:bg-emerald-500 hover:shadow-emerald-800/50 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full rounded-2xl btn-gold-metallic px-5 py-3.5 sm:py-4 text-xs sm:text-sm font-extrabold uppercase tracking-wider transition-all"
             >
               Create a Room
             </button>
@@ -211,13 +213,13 @@ export default function Home() {
                   if (e.key === "Enter" && roomCode.length === 6) enterRoom();
                 }}
                 placeholder="Enter 6-digit room code"
-                className="w-full rounded-2xl border border-slate-700/70 bg-slate-950/80 px-4 py-3.5 text-center font-mono text-base tracking-widest text-emerald-400 placeholder:text-slate-600 placeholder:font-sans placeholder:text-xs placeholder:tracking-normal outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full rounded-2xl border border-amber-900/30 bg-[#0a1020]/80 px-4 py-3.5 text-center font-mono text-base tracking-widest text-amber-400 placeholder:text-slate-600 placeholder:font-sans placeholder:text-xs placeholder:tracking-normal outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
               />
 
               <button
                 onClick={enterRoom}
                 disabled={roomCode.length !== 6}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-800 px-5 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 transition-all hover:bg-slate-700 hover:text-white hover:border-slate-600 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 disabled:hover:bg-slate-800 disabled:hover:border-slate-700"
+                className="w-full rounded-2xl border border-amber-900/40 bg-[#141d35] px-5 py-3.5 text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-300 transition-all hover:bg-[#1a2540] hover:text-white hover:border-amber-800/60 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100 disabled:hover:bg-[#141d35] disabled:hover:border-amber-900/40"
               >
                 Join Room
               </button>
@@ -284,21 +286,21 @@ function CreateRoomModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 sm:p-6 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 sm:p-6 backdrop-blur-md overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-3xl border border-slate-700/60 bg-slate-900 p-6 sm:p-8 shadow-[0_8px_60px_rgba(0,0,0,0.6)] animate-card-deal"
+        className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h2 className="text-lg font-black tracking-wide text-white">Create New Room</h2>
-          <span className="rounded-full bg-emerald-950/60 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-800/50">
+        <div className="flex items-center justify-between border-b border-amber-500/30 pb-3">
+          <h2 className="text-xl font-black tracking-wider text-gold-metallic font-logo">Create New Room</h2>
+          <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-gold-metallic border border-amber-500/40">
             Admin
           </span>
         </div>
 
-        <label className="mt-5 block text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gold-metallic font-logo">
           Total Players ({MIN_PLAYERS}–{MAX_PLAYERS})
         </label>
         <div className="mt-2 grid grid-cols-4 gap-1.5 sm:gap-2">
@@ -307,10 +309,10 @@ function CreateRoomModal({
               key={n}
               type="button"
               onClick={() => setNoOfPlayers(n)}
-              className={`rounded-xl border py-2.5 text-xs font-bold transition-all ${
+              className={`rounded-xl py-2.5 text-xs font-extrabold transition-all cursor-pointer ${
                 noOfPlayers === n
-                  ? "border-emerald-500 bg-emerald-600 text-white shadow-lg shadow-emerald-900/40"
-                  : "border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:bg-slate-800 hover:text-slate-300"
+                  ? "btn-gold-metallic scale-105"
+                  : "border border-amber-500/30 bg-[#060e1a]/90 text-amber-200 hover:border-amber-400 hover:bg-[#112240]"
               }`}
             >
               {n}
@@ -326,7 +328,7 @@ function CreateRoomModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-2xl border border-slate-700 bg-slate-800 py-3 text-xs font-bold text-slate-400 transition hover:bg-slate-700 hover:text-slate-300"
+            className="flex-1 rounded-2xl border border-amber-500/30 bg-[#112240] py-3 text-xs font-bold text-amber-200 transition hover:bg-[#1a2f54] hover:text-white"
           >
             Cancel
           </button>
@@ -334,7 +336,7 @@ function CreateRoomModal({
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="flex-1 rounded-2xl bg-emerald-600 py-3 text-xs font-bold text-white shadow-lg shadow-emerald-900/40 transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex-1 rounded-2xl btn-gold-metallic py-3 text-xs font-extrabold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-40"
           >
             {submitting ? "Starting…" : "Start Game"}
           </button>

@@ -6,6 +6,7 @@ export * from "./game/types";
 
 /** A single seat in a room. The creator of the room has `admin: true`. */
 export type Player = {
+  id?: string;
   name: string;
   admin: boolean;
 };

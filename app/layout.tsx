@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Press_Start_2P, Cinzel } from "next/font/google";
+import { Geist, Geist_Mono, Press_Start_2P, Cinzel, Cinzel_Decorative } from "next/font/google";
 import "./globals.css";
 import LandscapeLock from "@/components/LandscapeLock";
 import { Toaster } from "sonner";
@@ -26,6 +26,12 @@ const cinzel = Cinzel({
   subsets: ["latin"],
 });
 
+const cinzelDecorative = Cinzel_Decorative({
+  variable: "--font-cinzel-decorative",
+  weight: "700",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "Cabo",
   description: "Create or join a room with Cabo",
@@ -43,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} ${cinzel.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} ${cinzel.variable} ${cinzelDecorative.variable} h-full antialiased`}
     >
       <body className="h-full w-full min-h-screen flex flex-col overflow-x-hidden bg-slate-950">
         <LandscapeLock />

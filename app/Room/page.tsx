@@ -3,7 +3,19 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DecoCards from "@/components/DecoCards";
 import RoomClosedModal from "@/components/RoomClosedModal";
-import { getRememberedPlayer, connectGameSocket, getRoom, startGame, forgetPlayer, toggleReady } from "@/shared/api";
+import {
+  getRememberedPlayer,
+  connectGameSocket,
+  getRoom,
+  startGame,
+  forgetPlayer,
+  toggleReady,
+  getStoredName,
+  setStoredName,
+  rememberPlayer,
+  joinRoom,
+  getPlayerId,
+} from "@/shared/api";
 import { MAX_PLAYERS, type ApiPlayer } from "@/shared/types";
 
 function RoomView() {
@@ -15,6 +27,12 @@ function RoomView() {
   const [noOfPlayers, setNoOfPlayers] = useState(MAX_PLAYERS);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [roomClosed, setRoomClosed] = useState(false);
+
+  // Name check modal state for direct room link access
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [joinNameInput, setJoinNameInput] = useState("");
+  const [joinError, setJoinError] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
 
   function triggerCountdown() {
     setCountdown((prev) => (prev === null ? 3 : prev));
@@ -32,6 +50,77 @@ function RoomView() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [countdown, id, router]);
+
+  function refreshRoomState() {
+    if (!id) return;
+    getRoom(id)
+      .then((room) => {
+        setPlayers(room.players);
+        setNoOfPlayers(room.max_players);
+        if (room.phase !== "lobby") {
+          router.push(`/Game?id=${encodeURIComponent(id)}`);
+        }
+      })
+      .catch((err) => {
+        console.error("[Room] Refresh room state failed:", err);
+      });
+  }
+
+  // Name check: verify if player has joined this room or has a stored name
+  useEffect(() => {
+    if (!id) return;
+
+    const remembered = getRememberedPlayer(id);
+    if (remembered?.name) {
+      // Player already remembered for this room
+      return;
+    }
+
+    const storedName = getStoredName();
+    if (storedName) {
+      // User has a stored name, attempt auto-join
+      joinRoom({ room_id: id, player_name: storedName })
+        .then((res: any) => {
+          rememberPlayer(id, { name: storedName, id: res.player_id }, res.max_players);
+          refreshRoomState();
+        })
+        .catch((err) => {
+          console.error("[Room] Auto-join with stored name failed:", err);
+          setJoinNameInput(storedName);
+          setShowNameModal(true);
+        });
+    } else {
+      // No name in storage — must prompt user for name before joining
+      setShowNameModal(true);
+    }
+  }, [id]);
+
+  async function handleJoinSubmit() {
+    const trimmed = joinNameInput.trim().slice(0, 30);
+    if (!trimmed || !id || isJoining) return;
+    setIsJoining(true);
+    setJoinError("");
+
+    try {
+      setStoredName(trimmed);
+      const res: any = await joinRoom({
+        room_id: id,
+        player_name: trimmed,
+      });
+      rememberPlayer(id, { name: trimmed, id: res.player_id }, res.max_players);
+      setShowNameModal(false);
+      refreshRoomState();
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.includes("400") || msg.includes("full") || msg.includes("capacity")) {
+        setJoinError("Room is full or capacity reached");
+      } else {
+        setJoinError(msg);
+      }
+    } finally {
+      setIsJoining(false);
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -75,9 +164,14 @@ function RoomView() {
     };
   }, [id, router]);
 
-  const myName = getRememberedPlayer(id)?.name ?? null;
-  const me = players.find((p) => p.name === myName);
-  const isAdmin = !!myName && players.some((p) => p.name === myName && p.is_admin);
+  const remembered = getRememberedPlayer(id);
+  const myName = remembered?.name ?? getStoredName() ?? null;
+  const me = players.find(
+    (p) =>
+      (remembered?.id && p.id === remembered.id) ||
+      (myName && p.name.trim().toLowerCase() === myName.trim().toLowerCase()),
+  );
+  const isAdmin = !!me && (me.is_admin || !!remembered?.admin);
 
   const nonAdmins = players.filter((p) => !p.is_admin);
   const allNonAdminsReady = nonAdmins.length > 0 && nonAdmins.every((p) => p.is_ready);
@@ -101,9 +195,11 @@ function RoomView() {
   }
 
   async function handleToggleReady() {
-    if (!me || !id) return;
+    if (!id) return;
+    const targetPlayer = me || (remembered?.id ? players.find((p) => p.id === remembered.id) : null);
+    if (!targetPlayer) return;
     try {
-      await toggleReady(id, me.id, !me.is_ready);
+      await toggleReady(id, targetPlayer.id, !targetPlayer.is_ready);
     } catch (err) {
       console.error("[ready] toggle failed:", err);
     }
@@ -126,7 +222,7 @@ function RoomView() {
       {/* 3-2-1 Countdown Overlay */}
       {countdown !== null && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 backdrop-blur-md animate-fade-in">
-          <p className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-4 animate-pulse">
+          <p className="text-xs font-bold uppercase tracking-widest text-amber-400 mb-4 animate-pulse">
             Get Ready! Game Starting In...
           </p>
           <div className="text-7xl sm:text-9xl font-black text-amber-400 animate-bounce drop-shadow-[0_0_25px_rgba(245,158,11,0.7)]">
@@ -135,12 +231,12 @@ function RoomView() {
         </div>
       )}
 
-      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-slate-700/60 bg-slate-900/90 p-5 sm:p-8 my-auto shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
+      <div className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-5 sm:p-8 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl">
         <div className="text-center">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
             Room Code
           </p>
-          <p className="mt-1 text-3xl font-black tracking-widest text-emerald-400 font-mono">{id}</p>
+          <p className="mt-1 text-3xl sm:text-4xl font-black tracking-widest text-gold-metallic font-mono">{id}</p>
           <p className="mt-2 text-xs font-medium text-slate-400">
             {seated.length} of {noOfPlayers} players joined
           </p>
@@ -152,27 +248,26 @@ function RoomView() {
             return (
               <li
                 key={p.id}
-                className="flex items-center gap-3 rounded-2xl border border-slate-700/60 bg-slate-950/80 px-4 py-3.5"
+                className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-emerald-400 border border-slate-700">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#112240] text-xs font-black text-gold-metallic border border-amber-500/40">
                   {p.name.charAt(0).toUpperCase()}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                    {p.name}
-                    {isMe && <span className="text-[9px] text-slate-500 font-normal">(You)</span>}
+                  <p className="truncate text-sm font-bold text-white">
+                    {p.name} {isMe && "(You)"}
                   </p>
                 </div>
                 {p.is_admin ? (
-                  <span className="rounded-full bg-amber-950/60 border border-amber-800/50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-300">
+                  <span className="rounded-full bg-amber-950/80 border border-amber-500/50 px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-amber-300">
                     Admin
                   </span>
                 ) : p.is_ready ? (
-                  <span className="rounded-full bg-emerald-950/60 border border-emerald-800/50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-400">
+                  <span className="rounded-full bg-amber-950/80 border border-amber-500/50 px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-amber-400">
                     ✓ Ready
                   </span>
                 ) : (
-                  <span className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                  <span className="rounded-full bg-[#112240] border border-amber-900/40 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">
                     Not Ready
                   </span>
                 )}
@@ -183,9 +278,9 @@ function RoomView() {
           {Array.from({ length: emptySeats }, (_, i) => (
             <li
               key={`e-${i}`}
-              className="flex items-center gap-3 rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 px-4 py-3.5"
+              className="flex items-center gap-3 rounded-2xl border border-dashed border-amber-900/30 bg-[#060e1a]/40 px-4 py-3.5"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-slate-600 border border-slate-800">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0a162b] text-xs font-bold text-slate-600 border border-amber-900/20">
                 ?
               </span>
               <span className="flex-1 text-xs font-medium text-slate-600">
@@ -199,7 +294,7 @@ function RoomView() {
           <button
             onClick={handleStart}
             disabled={seated.length < 2 || !allNonAdminsReady}
-            className="mt-6 w-full rounded-2xl bg-emerald-600 px-5 py-4 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-900/40 transition-all hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:bg-emerald-600"
+            className="mt-6 w-full rounded-2xl btn-gold-metallic px-5 py-4 text-xs font-extrabold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-40"
           >
             {seated.length < 2
               ? "Waiting for 2+ Players..."
@@ -210,10 +305,10 @@ function RoomView() {
         ) : (
           <button
             onClick={handleToggleReady}
-            className={`mt-6 w-full rounded-2xl px-5 py-4 text-xs font-bold uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] ${
+            className={`mt-6 w-full rounded-2xl px-5 py-4 text-xs font-extrabold uppercase tracking-wider transition-all hover:scale-[1.02] active:scale-[0.98] ${
               me?.is_ready
-                ? "bg-slate-800 text-amber-300 border border-amber-500/40 hover:bg-slate-700"
-                : "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 hover:bg-emerald-500"
+                ? "bg-[#112240] text-amber-300 border border-amber-500/50 hover:bg-[#1a2f54]"
+                : "btn-gold-metallic"
             }`}
           >
             {me?.is_ready ? "Cancel Ready" : "Ready Up!"}
@@ -221,6 +316,55 @@ function RoomView() {
         )}
         {roomClosed && <RoomClosedModal id={id} />}
       </div>
+
+      {/* Enter Name Modal when joining directly via link without session name */}
+      {showNameModal && !roomClosed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
+          <div
+            className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-6">
+              <span className="text-3xl">🃏</span>
+              <h2 className="mt-2 text-xl font-black tracking-wider text-gold-metallic font-logo">
+                Join Room #{id}
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                Please enter your name to join the game
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <input
+                autoFocus
+                type="text"
+                maxLength={30}
+                value={joinNameInput}
+                onChange={(e) => setJoinNameInput(e.target.value.slice(0, 30))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleJoinSubmit();
+                }}
+                placeholder="Enter your name (max 30 chars)"
+                className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+              />
+
+              {joinError && (
+                <p className="text-xs font-semibold text-rose-400 bg-rose-950/50 p-2.5 rounded-xl border border-rose-900/50 text-center">
+                  {joinError}
+                </p>
+              )}
+
+              <button
+                onClick={handleJoinSubmit}
+                disabled={!joinNameInput.trim() || isJoining}
+                className="w-full rounded-2xl btn-gold-metallic px-5 py-3.5 text-xs font-extrabold uppercase tracking-wider transition disabled:opacity-40 cursor-pointer"
+              >
+                {isJoining ? "Joining Room..." : "Join Room"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
