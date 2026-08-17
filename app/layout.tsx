@@ -36,8 +36,12 @@ export const metadata: Metadata = {
   title: "Cabo",
   description: "Create or join a room with Cabo",
   icons: {
-    icon: "/icon.png",
-    apple: "/apple-icon.png",
+    icon: [
+      { url: "/icon.png?v=2", type: "image/png" },
+      { url: "/favicon.ico?v=2" },
+    ],
+    shortcut: "/icon.png?v=2",
+    apple: "/apple-icon.png?v=2",
   },
 };
 
