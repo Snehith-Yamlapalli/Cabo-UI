@@ -163,12 +163,24 @@ export default function Home() {
         ) : (
           /* Step 2: Create / Join (name already set) */
           <div className="space-y-4">
-            {/* Welcome badge */}
-            <div className="text-center mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                Playing as
-              </span>
-              <p className="text-sm font-bold text-white mt-0.5">{playerName}</p>
+            {/* Playing as Name Badge with Change Name action */}
+            <div className="glass-panel bg-slate-900/90 border border-slate-700/60 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xl">
+              <div className="flex flex-col text-left">
+                <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
+                  Playing as
+                </span>
+                <span className="text-base sm:text-lg font-black text-amber-400 tracking-wide truncate max-w-[170px] sm:max-w-[210px]">
+                  {playerName}
+                </span>
+              </div>
+              <button
+                onClick={() => setNameReady(false)}
+                className="shrink-0 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600/60 text-slate-200 hover:text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow cursor-pointer"
+                title="Change Name"
+              >
+                <span>Change</span>
+                <span className="text-[11px]">✏️</span>
+              </button>
             </div>
 
             <button
@@ -241,6 +253,7 @@ function CreateRoomModal({
   const [error, setError] = useState("");
 
   async function submit() {
+    if (submitting) return;
     setSubmitting(true);
     setError("");
     try {
@@ -250,6 +263,19 @@ function CreateRoomModal({
       setSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Enter" && !submitting) {
+        e.preventDefault();
+        submit();
+      } else if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [noOfPlayers, submitting, onClose]);
 
   const sizes = Array.from(
     { length: MAX_PLAYERS - MIN_PLAYERS + 1 },

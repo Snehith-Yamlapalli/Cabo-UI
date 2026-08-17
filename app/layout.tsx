@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Press_Start_2P, Cinzel } from "next/font/google";
 import "./globals.css";
-import Header from "@/components/Header";
 import LandscapeLock from "@/components/LandscapeLock";
 import { Toaster } from "sonner";
 
@@ -30,6 +29,10 @@ const cinzel = Cinzel({
 export const metadata: Metadata = {
   title: "Cabo",
   description: "Create or join a room with Cabo",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -44,7 +47,6 @@ export default function RootLayout({
     >
       <body className="h-full w-full min-h-screen flex flex-col overflow-x-hidden bg-slate-950">
         <LandscapeLock />
-        <Header />
         <div className="flex-1 w-full min-h-0 relative flex flex-col overflow-y-auto">
           {children}
         </div>
