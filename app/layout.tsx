@@ -22,7 +22,7 @@ const pixel = Press_Start_2P({
 
 const cinzel = Cinzel({
   variable: "--font-cinzel",
-  weight: ["900"],
+  weight: ["400", "500", "600", "700", "800", "900"],
   subsets: ["latin"],
 });
 
@@ -60,7 +60,7 @@ export default function RootLayout({
         <div className="flex-1 w-full min-h-0 relative flex flex-col overflow-y-auto">
           {children}
         </div>
-        <Toaster position="top-center" />
+        <Toaster position="top-right" richColors theme="dark" />
       </body>
     </html>
   );

@@ -263,6 +263,6 @@ export function getStoredName(): string {
 
 export function setStoredName(name: string) {
   if (typeof window === "undefined" || !name) return;
-  const clean = name.trim().slice(0, 30);
+  const clean = name.trim().slice(0, 10);
   localStorage.setItem(PLAYER_NAME_KEY, clean);
 }

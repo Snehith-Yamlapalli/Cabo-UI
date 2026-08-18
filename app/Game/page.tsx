@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import DecoCards from "@/components/DecoCards";
 import RoomClosedModal from "@/components/RoomClosedModal";
+import RulesModal from "@/components/RulesModal";
 import {
   getRememberedPlayer,
   connectGameSocket,
@@ -326,7 +327,10 @@ function Hand({
 
             const isTimedReveal = Boolean(c.reveal_end_time);
             const isRevealActive = isTimedReveal ? (c.reveal_end_time! > now) : true;
-            const faceUp = isFinished || (Boolean(myId && c.visible_to.includes(myId)) && isRevealActive);
+            const isCardVisibleToMe = Boolean(
+              myId && c.visible_to?.some((id) => String(id).toLowerCase() === String(myId).toLowerCase())
+            );
+            const faceUp = isFinished || (isCardVisibleToMe && isRevealActive);
 
             return (
               <CardView
@@ -539,7 +543,7 @@ function ScorecardModal({
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold text-amber-400">Score</span>
             <div>
-              <h2 className="text-lg sm:text-xl font-black text-gold-metallic font-logo uppercase tracking-wider leading-none">
+              <h2 className="text-lg sm:text-xl font-black text-gold-metallic font-sans uppercase tracking-wider leading-none">
                 Match Scorecard
               </h2>
               <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
@@ -700,8 +704,8 @@ const SEAT_ASSIGNMENTS: Record<number, SeatId[]> = {
   1: ["top-center"],
   2: ["top-left", "top-right"],
   3: ["top-left", "top-center", "top-right"],
-  4: ["top-left", "top-center", "top-right", "bottom-right"],
-  5: ["top-left", "top-center", "top-right", "bottom-left", "bottom-right"],
+  4: ["bottom-left", "top-left", "top-right", "bottom-right"],
+  5: ["bottom-left", "top-left", "top-center", "top-right", "bottom-right"],
 };
 
 type SeatedOpponent = {
@@ -711,7 +715,18 @@ type SeatedOpponent = {
 };
 
 function calculateSeatedOpponents(room: ApiRoomState, myId: string | null): SeatedOpponent[] {
-  const allOtherPlayers = room.players.filter((p) => p.id !== myId);
+  // Rotate players array so that opponents are ordered CLOCKWISE in turn sequence starting right after myId
+  const myIndex = room.players.findIndex((p) => p.id === myId);
+  const allOtherPlayers: ApiPlayer[] = [];
+  if (myIndex >= 0) {
+    for (let i = 1; i < room.players.length; i++) {
+      const idx = (myIndex + i) % room.players.length;
+      allOtherPlayers.push(room.players[idx]);
+    }
+  } else {
+    allOtherPlayers.push(...room.players);
+  }
+
   if (allOtherPlayers.length === 0) return [];
 
   const isActiveRound = room.phase === "peeking" || room.phase === "playing" || room.phase === "cabo_round";
@@ -1199,99 +1214,7 @@ function RulesButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-function RulesModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-2 sm:p-4 animate-fade-in">
-      <div className="glass-panel w-full max-w-sm sm:max-w-lg p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-amber-500/50 shadow-2xl flex flex-col gap-2.5 sm:gap-4 text-slate-100 max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center border-b border-slate-700/60 pb-2 sm:pb-3">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className="text-sm sm:text-xl">📜</span>
-            <div>
-              <h2 className="text-sm sm:text-lg font-black text-gold-metallic font-logo uppercase tracking-wider leading-none">
-                Game Rules & Powers Guide
-              </h2>
-              <p className="text-[8px] sm:text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
-                Cabo Card Powers & Sticky Mechanics
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300 font-bold text-[10px] sm:text-xs"
-          >
-            ✕
-          </button>
-        </div>
 
-        {/* Card Powers Section */}
-        <div className="space-y-1.5 sm:space-y-2">
-          <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
-            <span>🃏</span> Card Powers (When Drawn from Deck & Discarded)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
-            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-amber-400">1 – 6</span>
-              <p className="text-[9px] sm:text-[11px] text-slate-300">No Power (Numeric value only).</p>
-            </div>
-            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-purple-300">7 & 8</span>
-              <p className="text-[9px] sm:text-[11px] text-slate-300">Peek at one of your <strong className="text-white">own cards</strong> (5s).</p>
-            </div>
-            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-purple-300">9 & 10</span>
-              <p className="text-[9px] sm:text-[11px] text-slate-300">Peek at one <strong className="text-white">opponent's card</strong> (5s).</p>
-            </div>
-            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-amber-300">Jack (J)</span>
-              <p className="text-[9px] sm:text-[11px] text-slate-300">Blind swap <strong className="text-white">any 2 cards</strong> on the board.</p>
-            </div>
-            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-amber-300">Queen (Q)</span>
-              <p className="text-[9px] sm:text-[11px] text-slate-300">Peek at 1 card, then choose whether to <strong className="text-white">swap it</strong>.</p>
-            </div>
-            <div className="bg-slate-800/60 p-2 sm:p-2.5 rounded-xl border border-slate-700/50">
-              <span className="text-[10px] sm:text-xs font-bold text-rose-300">King (K)</span>
-              <p className="text-[9px] sm:text-[11px] text-slate-300"><strong className="text-white">Trash/Discard</strong> one of your own cards.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Sticky Rules Section */}
-        <div className="space-y-1.5 sm:space-y-2 border-t border-slate-700/60 pt-2 sm:pt-3">
-          <h3 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
-            <span>📌</span> Sticky Mechanics
-          </h3>
-          <div className="bg-slate-800/60 p-2 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-700/50 space-y-1 sm:space-y-2 text-[9px] sm:text-xs text-slate-300">
-            <p>
-              • If top Discard card matches a card in hand, click it to <strong className="text-amber-300">Sticky</strong> out of turn!
-            </p>
-            <p>
-              • <strong className="text-amber-400">Successful Sticky:</strong> Card is discarded into pile.
-            </p>
-            <p>
-              • <strong className="text-rose-400">Failed Sticky:</strong> Draw a penalty card from deck!
-            </p>
-            <p>
-              • <strong className="text-indigo-300">Sticky Opponent's Card:</strong> <strong className="text-white">Give one of your cards to that opponent</strong> to fill their slot!
-            </p>
-            <p className="text-[8px] sm:text-[11px] text-slate-400 italic">
-              * Note: Sticky disabled if hand size &ge; 8.
-            </p>
-          </div>
-        </div>
-
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="w-full py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold border border-amber-500/40 text-[10px] sm:text-xs transition"
-        >
-          Close Rules
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /* ─────────────────────────── Sticky Resolution Banner ─────────────────────────── */
 
@@ -1311,6 +1234,27 @@ function StickyResolutionBanner({ resolution, players, myId }: { resolution: Api
   );
 }
 
+/* ─────────────────────────── Peeking Banner ─────────────────────────── */
+
+function PeekingBanner({ peekEndTime }: { peekEndTime?: number | null }) {
+  const [now, setNow] = useState(Date.now() / 1000);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now() / 1000), 200);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!peekEndTime || now >= peekEndTime) return null;
+  const remaining = Math.max(0, Math.ceil(peekEndTime - now));
+  return (
+    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-4 w-full max-w-sm">
+      <div className="bg-amber-950/90 backdrop-blur text-amber-300 px-5 py-3 rounded-2xl shadow-2xl border border-amber-500/60 text-center text-sm font-extrabold animate-pulse">
+        👀 Memorize your 2 cards! ({remaining}s)
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────── Power Banner ─────────────────────────── */
 
 function PowerBanner({ room, myId, powerTargets, onSkip }: { room: ApiRoomState; myId: string | null; powerTargets: string[]; onSkip: () => void }) {
@@ -1319,16 +1263,21 @@ function PowerBanner({ room, myId, powerTargets, onSkip }: { room: ApiRoomState;
     if (!["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pa)) return null;
 
     let msg = "";
+    let skipBtnText = "⏩ Skip Power";
     if (pa === "look_self") msg = "POWER (7/8): Peek at one of your own cards!";
     else if (pa === "look_other") msg = "POWER (9/10): Peek at one opponent's card!";
     else if (pa === "discard_self") msg = "POWER (K): Select one of your cards to trash!";
     else if (pa === "blind_swap") {
         if (powerTargets.length === 0) msg = "POWER (J): Select a card (yours or opponent's) to swap!";
-        else msg = "POWER (J): Select the other card to swap with!";
+        else msg = "POWER (J): Select the second card to swap with!";
     }
     else if (pa === "look_and_swap") {
-        if (!room.turn.first_swap_target) msg = "POWER (Q): Select a card to peek at!";
-        else msg = "POWER (Q): Select the second card to swap with!";
+        if (!room.turn.first_swap_target) {
+            msg = "POWER (Q): Select a card to peek at!";
+        } else {
+            msg = "POWER (Q): Peeked! Select second card to swap, or keep cards.";
+            skipBtnText = "🛡️ Keep Cards (Skip Swap)";
+        }
     }
 
     return (
@@ -1338,9 +1287,9 @@ function PowerBanner({ room, myId, powerTargets, onSkip }: { room: ApiRoomState;
       </div>
       <button
         onClick={onSkip}
-        className="glass-panel bg-purple-950/80 hover:bg-purple-900 text-purple-200 text-xs font-semibold px-3 py-1 rounded-xl border border-purple-400/50 shadow hover:scale-105 active:scale-95 transition-all pointer-events-auto"
+        className="glass-panel bg-purple-950/80 hover:bg-purple-900 text-purple-200 text-xs font-semibold px-3 py-1 rounded-xl border border-purple-400/50 shadow hover:scale-105 active:scale-95 transition-all pointer-events-auto cursor-pointer"
       >
-        ⏩ Skip Power
+        {skipBtnText}
       </button>
     </div>
     );
@@ -1493,7 +1442,16 @@ function GameTable() {
         (myName && p.name.trim().toLowerCase() === myName.trim().toLowerCase()),
     ) || null;
   const myId = me?.id ?? null;
-  const others = room.players.filter((p) => p.id !== myId);
+  const myIndex = room.players.findIndex((p) => p.id === myId);
+  const others: ApiPlayer[] = [];
+  if (myIndex >= 0) {
+    for (let i = 1; i < room.players.length; i++) {
+      const idx = (myIndex + i) % room.players.length;
+      others.push(room.players[idx]);
+    }
+  } else {
+    others.push(...room.players);
+  }
   const currentTurnId = room.players[room.current_turn]?.id ?? null;
   const discardTop =
     room.discard_pile.length > 0
@@ -1503,7 +1461,7 @@ function GameTable() {
   const isSittingOut = !!me && (!room.hands[me.id] || room.hands[me.id].length === 0);
 
   async function handleJoinForNextRound(nameToUse?: string) {
-    const finalName = (nameToUse || getStoredName() || "").trim().slice(0, 30);
+    const finalName = (nameToUse || getStoredName() || "").trim().slice(0, 10);
     if (!finalName) {
       setShowNameModal(true);
       return;
@@ -1706,6 +1664,17 @@ function GameTable() {
     const activeRes = room.active_resolutions?.[0];
     const isPowerActive = isMyTurn && ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pendingAction);
 
+    const caboCallerPlayer = room.players.find((p) => p.called_cabo);
+    const caboCallerId = caboCallerPlayer?.id;
+    const cardOwnerId = getCardOwnerId(cardId);
+
+    // Freeze Cabo Caller's cards against other players' powers & sticky actions
+    if (caboCallerId && cardOwnerId === caboCallerId && myId !== caboCallerId) {
+      setStickyWarning("⚠️ Cards of the player who called CABO are frozen and protected!");
+      setTimeout(() => setStickyWarning(null), 3500);
+      return;
+    }
+
     // 1. Give Card Resolution
     if (activeRes?.giver_id === myId && isMyCard) {
       actions.onGiveCard(cardId);
@@ -1720,17 +1689,6 @@ function GameTable() {
 
     // 3. Powers
     if (isPowerActive) {
-      // Check if clicked card matches discard top rank for immediate Sticky
-      const allCards = Object.values(room.hands).flat();
-      const clickedCardObj = allCards.find((c) => c?.id === cardId);
-      const canSticky = room.phase === "playing" && !activeRes && room.discard_pile.length > 0;
-      const matchesDiscard = discardTop && clickedCardObj && clickedCardObj.rank === discardTop.rank;
-
-      if (canSticky && matchesDiscard && !room.last_discard_was_sticky) {
-        actions.onSticky(cardId);
-        return;
-      }
-
       if (pendingAction === "look_self" && isMyCard) {
         actions.onPowerLook(cardId);
       } else if (pendingAction === "look_other" && !isMyCard) {
@@ -1768,8 +1726,8 @@ function GameTable() {
       return;
     }
 
-    // 4. Sticky
-    const canSticky = room.phase === "playing" && !activeRes && room.discard_pile.length > 0;
+    // 4. Sticky (Enabled during playing & cabo_round)
+    const canSticky = (room.phase === "playing" || room.phase === "cabo_round") && !activeRes && room.discard_pile.length > 0;
     if (canSticky) {
       actions.onSticky(cardId);
     }
@@ -1789,7 +1747,7 @@ function GameTable() {
       if (pendingAction === "look_and_swap") return true;
     }
 
-    const canSticky = room.phase === "playing" && !activeRes && room.discard_pile.length > 0;
+    const canSticky = (room.phase === "playing" || room.phase === "cabo_round") && !activeRes && room.discard_pile.length > 0;
     return canSticky;
   };
 
@@ -1807,9 +1765,11 @@ function GameTable() {
     <>
       <ActionToast log={room.last_action_log} />
       <WarningToast message={stickyWarning} onClose={() => setStickyWarning(null)} />
+      <PeekingBanner peekEndTime={room.peek_end_time} />
       <PowerBanner room={room} myId={myId} powerTargets={powerTargets} onSkip={async () => {
         if (!id || !myId || busy) return;
         setBusy(true);
+        setPowerTargets([]);
         try {
           await endTurn(id, myId);
         } catch (e) { console.error("Skip power failed", e); }
@@ -1828,7 +1788,7 @@ function GameTable() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
           <div className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal text-center">
             <span className="text-4xl">🎴</span>
-            <h2 className="mt-3 text-xl sm:text-2xl font-black tracking-wider text-gold-metallic font-logo">
+            <h2 className="mt-3 text-xl sm:text-2xl font-black tracking-wider text-gold-metallic font-sans">
               Game in Progress
             </h2>
             <p className="mt-2 text-xs text-slate-300">
@@ -1873,7 +1833,7 @@ function GameTable() {
           <div className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal">
             <div className="text-center mb-6">
               <span className="text-3xl">🃏</span>
-              <h2 className="mt-2 text-xl font-black tracking-wider text-gold-metallic font-logo">
+              <h2 className="mt-2 text-xl font-black tracking-wider text-gold-metallic font-sans">
                 Enter Your Name
               </h2>
               <p className="mt-1 text-xs text-slate-400">
@@ -1885,13 +1845,13 @@ function GameTable() {
               <input
                 autoFocus
                 type="text"
-                maxLength={30}
+                maxLength={10}
                 value={joinNameInput}
-                onChange={(e) => setJoinNameInput(e.target.value.slice(0, 30))}
+                onChange={(e) => setJoinNameInput(e.target.value.slice(0, 10))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleJoinForNextRound(joinNameInput);
                 }}
-                placeholder="Enter your name (max 30 chars)"
+                placeholder="Enter your name (max 10 chars)"
                 className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
               />
 
@@ -1929,7 +1889,7 @@ function GameTable() {
               👑
             </div>
 
-            <h2 className="mt-4 text-xl sm:text-2xl font-black tracking-wider text-rose-400 font-logo">
+            <h2 className="mt-4 text-xl sm:text-2xl font-black tracking-wider text-rose-400 font-sans">
               End Game for Everyone?
             </h2>
             <p className="mt-2 text-xs leading-relaxed text-slate-300">
@@ -1979,7 +1939,7 @@ function GameTable() {
       {/* Sitting Out Banner & Ready Button for Mid-Game Joiners */}
       {me && isSittingOut && room.phase !== "finished" && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md rounded-2xl gold-card-border bg-[#0a162b]/95 p-4 text-center shadow-2xl backdrop-blur-md border border-amber-500/40">
-          <p className="text-xs font-extrabold text-gold-metallic font-logo uppercase tracking-wide">
+          <p className="text-xs font-extrabold text-gold-metallic font-sans uppercase tracking-wide">
             You are Sitting Out this Round!
           </p>
           <p className="mt-1 text-[11px] text-slate-300">

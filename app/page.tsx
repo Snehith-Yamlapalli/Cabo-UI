@@ -1,14 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { createRoom, joinRoom, rememberPlayer, getRememberedPlayer, getRoom, getStoredName, setStoredName } from "@/shared/api";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/shared/types";
 
 import DecoCards from "@/components/DecoCards";
+import RulesModal from "@/components/RulesModal";
 
 export default function Home() {
   const [roomCode, setRoomCode] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showRules, setShowRules] = useState(false);
   const [playerName, setPlayerName] = useState("");
   const [nameReady, setNameReady] = useState(false);
   const router = useRouter();
@@ -23,7 +26,7 @@ export default function Home() {
   }, []);
 
   function saveName() {
-    const trimmed = playerName.trim().slice(0, 30);
+    const trimmed = playerName.trim().slice(0, 10);
     if (!trimmed) return;
     setStoredName(trimmed);
     setPlayerName(trimmed);
@@ -31,11 +34,11 @@ export default function Home() {
   }
 
   async function startGame(noOfPlayers: number) {
-    const name = playerName.trim().slice(0, 30);
+    const name = playerName.trim().slice(0, 10);
     if (!name) return;
     const res = await createRoom({ name, noOfPlayers, isAdmin: true });
     if (!res.room_id) {
-      alert("Could not create the room. Try again.");
+      toast.error("Could not create the room. Try again.");
       return;
     }
     await joinRoom({ room_id: res.room_id, player_name: name });
@@ -80,7 +83,7 @@ export default function Home() {
     } catch (err: any) {
       const msg = (err?.message || "").toLowerCase();
       if (msg.includes("full")) {
-        alert(`Room ${code} is full!`);
+        toast.error(`Room ${code} is full!`);
         return;
       }
       if (msg.includes("already in this room") || msg.includes("already taken") || msg.includes("name")) {
@@ -100,12 +103,12 @@ export default function Home() {
             }
             return;
           } catch (retryErr: any) {
-            alert(retryErr.message || "Failed to join room.");
+            toast.error(retryErr.message || "Failed to join room.");
           }
         }
         return;
       }
-      alert(err.message || `Room ${code} has been closed or does not exist`);
+      toast.error(err?.message || `Room ${code} has been closed or does not exist`);
     }
   }
 
@@ -147,11 +150,11 @@ export default function Home() {
             <input
               autoFocus
               type="text"
-              maxLength={30}
+              maxLength={10}
               value={playerName}
-              onChange={(e) => setPlayerName(e.target.value.slice(0, 30))}
+              onChange={(e) => setPlayerName(e.target.value.slice(0, 10))}
               onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
-              placeholder="Enter your name (max 30 chars)"
+              placeholder="Enter your name (max 10 chars)"
               className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 placeholder:text-xs outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
             />
             <button
@@ -227,8 +230,19 @@ export default function Home() {
           </div>
         )}
 
+        {/* Rulebook Button */}
+        <div className="mt-5 border-t border-amber-500/20 pt-4 flex flex-col items-center">
+          <button
+            onClick={() => setShowRules(true)}
+            className="w-full py-3 px-4 rounded-2xl glass-panel bg-[#112240]/80 hover:bg-[#182d54] text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition hover:scale-[1.02] active:scale-95 cursor-pointer"
+          >
+            <span>📜</span>
+            <span>Rulebook & How to Play</span>
+          </button>
+        </div>
+
         {/* Subtle bottom accent */}
-        <div className="mt-6 flex justify-center gap-3 text-[10px] text-slate-700 tracking-wider">
+        <div className="mt-4 flex justify-center gap-3 text-[10px] text-slate-700 tracking-wider">
           <span>♠</span><span>♣</span><span>♥</span><span>♦</span>
         </div>
       </div>
@@ -238,6 +252,10 @@ export default function Home() {
           onClose={() => setShowCreate(false)}
           onStart={startGame}
         />
+      )}
+
+      {showRules && (
+        <RulesModal onClose={() => setShowRules(false)} />
       )}
     </main>
   );
@@ -294,13 +312,13 @@ function CreateRoomModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-amber-500/30 pb-3">
-          <h2 className="text-xl font-black tracking-wider text-gold-metallic font-logo">Create New Room</h2>
+          <h2 className="text-xl font-black tracking-wider text-gold-metallic font-sans">Create New Room</h2>
           <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-gold-metallic border border-amber-500/40">
             Admin
           </span>
         </div>
 
-        <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gold-metallic font-logo">
+        <label className="mt-5 block text-xs font-bold uppercase tracking-wider text-gold-metallic font-sans">
           Total Players ({MIN_PLAYERS}–{MAX_PLAYERS})
         </label>
         <div className="mt-2 grid grid-cols-4 gap-1.5 sm:gap-2">

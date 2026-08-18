@@ -37,6 +37,7 @@ export type ApiPlayer = {
   round_score: number;
   is_admin: boolean;
   is_ready?: boolean;
+  called_cabo?: boolean;
 };
 
 export type ApiStickyResolution = {
@@ -62,6 +63,7 @@ export type ApiRoomState = {
   phase: "lobby" | "peeking" | "playing" | "cabo_round" | "finished";
   round_number?: number;
   peek_end_time?: number;
+  cabo_caller_index?: number | null;
   players: ApiPlayer[];
   /** Each player's hand, keyed by player id. Contains nulls for empty slots. */
   hands: Record<string, (ApiCard | null)[]>;
@@ -81,5 +83,5 @@ export type ApiRoomState = {
   last_discard_was_sticky?: boolean;
 };
 
-export const MIN_PLAYERS = 3;
+export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;

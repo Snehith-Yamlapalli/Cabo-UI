@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import DecoCards from "@/components/DecoCards";
 import RoomClosedModal from "@/components/RoomClosedModal";
 import {
@@ -15,6 +16,8 @@ import {
   rememberPlayer,
   joinRoom,
   getPlayerId,
+  destroyRoom,
+  leaveRoom,
 } from "@/shared/api";
 import { MAX_PLAYERS, type ApiPlayer } from "@/shared/types";
 
@@ -33,6 +36,22 @@ function RoomView() {
   const [joinNameInput, setJoinNameInput] = useState("");
   const [joinError, setJoinError] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+
+  const [showEndGameModal, setShowEndGameModal] = useState(false);
+
+  async function handleLeaveRoom() {
+    if (!id) return;
+    const targetPlayer = me || (remembered?.id ? players.find((p) => p.id === remembered.id) : null);
+    if (targetPlayer?.id) {
+      try {
+        await leaveRoom(id, targetPlayer.id);
+      } catch (err) {
+        console.error("[leave] failed:", err);
+      }
+    }
+    forgetPlayer(id);
+    router.push("/");
+  }
 
   function triggerCountdown() {
     setCountdown((prev) => (prev === null ? 3 : prev));
@@ -96,7 +115,7 @@ function RoomView() {
   }, [id]);
 
   async function handleJoinSubmit() {
-    const trimmed = joinNameInput.trim().slice(0, 30);
+    const trimmed = joinNameInput.trim().slice(0, 10);
     if (!trimmed || !id || isJoining) return;
     setIsJoining(true);
     setJoinError("");
@@ -188,7 +207,7 @@ function RoomView() {
       triggerCountdown();
     } catch (err) {
       console.error("[start] failed:", err);
-      alert(
+      toast.error(
         `Could not start the game: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
@@ -202,6 +221,29 @@ function RoomView() {
       await toggleReady(id, targetPlayer.id, !targetPlayer.is_ready);
     } catch (err) {
       console.error("[ready] toggle failed:", err);
+    }
+  }
+
+  async function handleShareLink() {
+    if (!id) return;
+    const url = `${window.location.origin}/Room?id=${encodeURIComponent(id)}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Join CABO Game Room",
+          text: `Join my CABO game room (Room Code: ${id})!`,
+          url: url,
+        });
+        return;
+      } catch (e) {
+        // Fallback to clipboard if share sheet is cancelled or fails
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Room link copied to clipboard! Share it with friends.");
+    } catch (e) {
+      toast.error(`Room URL: ${url}`);
     }
   }
 
@@ -232,6 +274,24 @@ function RoomView() {
       )}
 
       <div className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-5 sm:p-8 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+        {/* Top-Left Close/Leave Room Button (Red X) */}
+        <button
+          onClick={() => setShowEndGameModal(true)}
+          className="absolute top-4 left-4 sm:top-5 sm:left-5 w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-500/50 shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center text-xs sm:text-sm font-black tracking-wider z-20"
+          title={isAdmin ? "Close Room" : "Return to Home Page"}
+        >
+          X
+        </button>
+
+        {/* Top-Right Share Button */}
+        <button
+          onClick={handleShareLink}
+          className="absolute top-4 right-4 sm:top-5 sm:right-5 w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-[#112240] hover:bg-[#1a2f54] text-amber-300 hover:text-white border border-amber-500/40 shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center text-xs sm:text-sm z-20"
+          title="Share Room Link"
+        >
+          🔗
+        </button>
+
         <div className="text-center">
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
             Room Code
@@ -317,6 +377,54 @@ function RoomView() {
         {roomClosed && <RoomClosedModal id={id} />}
       </div>
 
+      {/* Admin / Player Exit Confirmation Modal */}
+      {showEndGameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-6 sm:p-8 shadow-[0_12px_60px_rgba(0,0,0,0.7)] animate-card-deal text-center border border-rose-900/40">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-rose-950/60 border border-rose-600/40 flex items-center justify-center text-3xl shadow-lg">
+              {isAdmin ? "👑" : "🚪"}
+            </div>
+
+            <h2 className="mt-4 text-lg sm:text-xl font-black tracking-wider text-rose-400 font-sans">
+              {isAdmin
+                ? "Are you sure you want to close the room?"
+                : "Are you sure you want to return to home page?"}
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-slate-300">
+              {isAdmin
+                ? `As Room Admin, closing Room #${id} will terminate the room for all connected players and return everyone to the home page.`
+                : `Leaving Room #${id} will remove you from the player list.`}
+            </p>
+
+            <div className="mt-6 flex flex-col gap-2.5">
+              <button
+                onClick={async () => {
+                  if (isAdmin) {
+                    if (id) {
+                      try { await destroyRoom(id); } catch (e) { console.error("End room failed", e); }
+                    }
+                    forgetPlayer(id);
+                    window.location.href = "/";
+                  } else {
+                    await handleLeaveRoom();
+                  }
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-rose-700 hover:bg-rose-600 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-rose-950/50 transition hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>{isAdmin ? "🛑 Yes, Close Room" : "🚪 Yes, Return Home"}</span>
+              </button>
+
+              <button
+                onClick={() => setShowEndGameModal(false)}
+                className="w-full py-3 px-4 rounded-2xl border border-slate-700/60 bg-slate-900/80 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition cursor-pointer"
+              >
+                Cancel & Stay in Lobby
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Enter Name Modal when joining directly via link without session name */}
       {showNameModal && !roomClosed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-fade-in">
@@ -338,13 +446,13 @@ function RoomView() {
               <input
                 autoFocus
                 type="text"
-                maxLength={30}
+                maxLength={10}
                 value={joinNameInput}
-                onChange={(e) => setJoinNameInput(e.target.value.slice(0, 30))}
+                onChange={(e) => setJoinNameInput(e.target.value.slice(0, 10))}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleJoinSubmit();
                 }}
-                placeholder="Enter your name (max 30 chars)"
+                placeholder="Enter your name (max 10 chars)"
                 className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
               />
 
