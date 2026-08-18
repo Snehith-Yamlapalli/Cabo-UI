@@ -241,16 +241,12 @@ export default function Home() {
           </button>
         </div>
 
-        {/* Subtle bottom accent */}
-        <div className="mt-4 flex justify-center gap-3 text-[10px] text-slate-700 tracking-wider">
-          <span>♠</span><span>♣</span><span>♥</span><span>♦</span>
-        </div>
       </div>
 
-      {/* Footer directly below the Card */}
-      <footer className="mt-3 relative z-10 text-[11px] text-slate-400 font-normal text-center">
+      {/* Footer pinned just above the bottom of the screen */}
+      <footer className="fixed bottom-4 inset-x-0 z-20 text-[11px] text-slate-400 font-normal text-center">
         <p className="flex items-center gap-1 flex-wrap justify-center">
-          <span>**Designed & Handled by</span>
+          <span>Designed & Handled by</span>
           <a
             href="https://github.com/Snehith-Yamlapalli"
             target="_blank"
