@@ -113,7 +113,7 @@ export default function Home() {
   }
 
   return (
-    <main className="relative flex min-h-full w-full items-center justify-center px-4 py-6 sm:py-10 my-auto">
+    <main className="relative flex min-h-full w-full flex-col items-center justify-center px-4 py-6 sm:py-10 my-auto">
       <DecoCards />
 
       {/* Main card */}
@@ -246,6 +246,30 @@ export default function Home() {
           <span>♠</span><span>♣</span><span>♥</span><span>♦</span>
         </div>
       </div>
+
+      {/* Footer directly below the Card */}
+      <footer className="mt-3 relative z-10 text-[11px] text-slate-400 font-normal text-center">
+        <p className="flex items-center gap-1 flex-wrap justify-center">
+          <span>**Designed & Handled by</span>
+          <a
+            href="https://github.com/Snehith-Yamlapalli"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-logo hover:underline hover:text-slate-200 transition tracking-wide text-slate-400"
+          >
+            Snehith
+          </a>
+          <span>,</span>
+          <a
+            href="https://github.com/RohanVarmaRagula"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-logo hover:underline hover:text-slate-200 transition tracking-wide text-slate-400"
+          >
+            Rohan
+          </a>
+        </p>
+      </footer>
 
       {showCreate && (
         <CreateRoomModal
