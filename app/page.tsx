@@ -54,7 +54,7 @@ export default function Home() {
     if (remembered) {
       try {
         const room = await getRoom(code);
-        const alreadyIn = room.players.some((p: any) => p.name === remembered.name);
+        const alreadyIn = room.players.some((p: any) => p.name.trim().toLowerCase() === remembered.name.trim().toLowerCase());
         if (alreadyIn) {
           if (room.phase === "lobby") {
             router.push(`/Room?id=${encodeURIComponent(code)}`);
