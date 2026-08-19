@@ -38,6 +38,8 @@ export type ApiPlayer = {
   is_admin: boolean;
   is_ready?: boolean;
   called_cabo?: boolean;
+  is_connected?: boolean;
+  has_left?: boolean;
 };
 
 export type ApiStickyResolution = {
@@ -77,6 +79,8 @@ export type ApiRoomState = {
     drawn_from: "deck" | "discard" | "none";
     pending_action: "none" | "draw" | "discard" | "look_self" | "look_other" | "blind_swap" | "look_and_swap" | "discard_self" | "sticky" | "finished";
     power_used: boolean;
+    turn_start_time?: number;
+    action_start_time?: number;
   };
   active_resolutions: ApiStickyResolution[];
   last_action_log?: string;

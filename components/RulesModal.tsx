@@ -108,6 +108,38 @@ export default function RulesModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
+        {/* Turn Timers & Laser Border */}
+        <div className="space-y-2 border-t border-slate-800 pt-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+            <span>⏱️</span> Turn Timers & Laser Border
+          </h3>
+          <div className="bg-[#112240]/60 p-3 rounded-2xl border border-slate-700/50 space-y-1.5 text-xs text-slate-300 leading-relaxed">
+            <p>
+              • <strong className="text-amber-400">8-Second Turn Limit:</strong> You have 8 seconds to draw a card. Watch the <strong className="text-amber-300">4-sided glowing laser border</strong> around your hand shrink corner-by-corner as time counts down! If time expires, a card is auto-drawn and discarded.
+            </p>
+            <p>
+              • <strong className="text-purple-300">10-Second Power Action Limit:</strong>
+            </p>
+            <ul className="pl-4 list-disc space-y-1 text-[11px] text-slate-400">
+              <li><strong className="text-slate-200">7 – 10 (Peeking):</strong> Auto-skipped after 10s if no card is selected.</li>
+              <li><strong className="text-slate-200">Jack (J) & Queen (Q) (Swapping):</strong> Auto-swaps your 1st available card with an opponent if 10s expire. (Once 1st card is picked, power cannot be cancelled mid-action!).</li>
+              <li><strong className="text-slate-200">King (K) (Trashing):</strong> Power expires at 10s without trashing (your loss!).</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Discard Pile Draw Rules */}
+        <div className="space-y-2 border-t border-slate-800 pt-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+            <span>🔄</span> Discard Pile Draw & Swap
+          </h3>
+          <div className="bg-[#112240]/60 p-3 rounded-2xl border border-slate-700/50 space-y-1 text-xs text-slate-300 leading-relaxed">
+            <p>
+              • Drawing from the Discard pile requires you to <strong className="text-amber-300">swap it with a card in your hand</strong>. You cannot immediately re-discard a card drawn from the discard pile!
+            </p>
+          </div>
+        </div>
+
         {/* Close Button */}
         <button
           onClick={onClose}

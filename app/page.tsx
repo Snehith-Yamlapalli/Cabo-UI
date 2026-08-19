@@ -243,8 +243,8 @@ export default function Home() {
 
       </div>
 
-      {/* Footer pinned just above the bottom of the screen */}
-      <footer className="fixed bottom-4 inset-x-0 z-20 text-[11px] text-slate-400 font-normal text-center">
+      {/* Footer placed directly below the card */}
+      <footer className="relative z-20 mt-4 sm:mt-6 text-[11px] text-slate-400 font-normal text-center pb-2">
         <p className="flex items-center gap-1 flex-wrap justify-center">
           <span>Designed & Handled by</span>
           <a

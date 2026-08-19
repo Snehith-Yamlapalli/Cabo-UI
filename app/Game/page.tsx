@@ -1,6 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import DecoCards from "@/components/DecoCards";
 import RoomClosedModal from "@/components/RoomClosedModal";
 import RulesModal from "@/components/RulesModal";
@@ -68,6 +69,7 @@ type GameActions = {
   onPowerLook: (cardId: string) => void;
   onPowerSwap: (card1Id: string, card2Id: string) => void;
   onPowerDiscard: (cardId: string) => void;
+  onSkipPower: () => void;
   onExitGame: () => void;
   onEndGame: () => void;
 };
@@ -106,7 +108,7 @@ function CardView({
       };
   const d = DIMS[size] ?? DIMS.md;
   const radius = compact ? 5 : 10;
-  const cursorClass = clickable ? "cursor-pointer ring-2 ring-amber-400/70 hover:ring-amber-300 hover:scale-105 transition-transform" : "";
+  const cursorClass = clickable ? "cursor-pointer hover:scale-105 transition-transform" : "";
   const glowClass = isGlowing ? "animate-card-glow" : "";
 
   const BADGE_DIMS: Record<string, { sizeClass: string; fontClass: string }> = compact
@@ -194,6 +196,83 @@ function getCardValue(c: ApiCard | null): number {
   return parseInt(c.rank, 10) || 0;
 }
 
+function EightSegmentGlowBorder({
+  startTime,
+  maxSeconds = 8,
+}: {
+  startTime?: number;
+  maxSeconds?: number;
+}) {
+  const [localStart, setLocalStart] = useState<number>(Date.now() / 1000);
+  const [now, setNow] = useState<number>(Date.now() / 1000);
+
+  useEffect(() => {
+    setLocalStart(Date.now() / 1000);
+    const timer = setInterval(() => setNow(Date.now() / 1000), 50);
+    return () => clearInterval(timer);
+  }, [startTime]);
+
+  const elapsed = Math.max(0, now - localStart);
+  const remaining = Math.max(0, maxSeconds - elapsed);
+  
+  // Calculate active glow segment count (0 to 8)
+  const activeSegments = Math.ceil((remaining / maxSeconds) * 8);
+  const isSegOn = (segIndex: number) => segIndex <= activeSegments;
+
+  return (
+    <div className="absolute -inset-0.5 pointer-events-none z-30 rounded-xl overflow-hidden">
+      {/* Segment 1: Top-Left (off first at 7s) */}
+      <div
+        className={`absolute top-0 left-0 w-[50%] h-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(8) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 2: Top-Right (off second at 6s) */}
+      <div
+        className={`absolute top-0 right-0 w-[50%] h-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(7) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 3: Right-Top (off third at 5s) */}
+      <div
+        className={`absolute top-0 right-0 h-[50%] w-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(6) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 4: Right-Bottom (off fourth at 4s) */}
+      <div
+        className={`absolute bottom-0 right-0 h-[50%] w-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(5) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 5: Bottom-Right (off fifth at 3s) */}
+      <div
+        className={`absolute bottom-0 right-0 w-[50%] h-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(4) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 6: Bottom-Left (off sixth at 2s) */}
+      <div
+        className={`absolute bottom-0 left-0 w-[50%] h-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(3) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 7: Left-Bottom (off seventh at 1s) */}
+      <div
+        className={`absolute bottom-0 left-0 h-[50%] w-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(2) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      {/* Segment 8: Left-Top (off last at 0s) */}
+      <div
+        className={`absolute top-0 left-0 h-[50%] w-[2.5px] bg-amber-400 transition-opacity duration-200 ${
+          isSegOn(1) ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
+  );
+}
+
 function Hand({
   player,
   cards,
@@ -207,6 +286,7 @@ function Hand({
   cardsClickable = false,
   isFinished = false,
   glowingCards = {},
+  room,
 }: {
   player: ApiPlayer;
   cards: (ApiCard | null)[];
@@ -220,6 +300,7 @@ function Hand({
   cardsClickable?: boolean;
   isFinished?: boolean;
   glowingCards?: Record<string, boolean>;
+  room?: ApiRoomState;
 }) {
   const [now, setNow] = useState(Date.now() / 1000);
   useEffect(() => {
@@ -286,12 +367,28 @@ function Hand({
 
   const currentRoundSum = cards.reduce((sum, c) => sum + getCardValue(c), 0);
 
+  if (player.has_left) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center opacity-0 pointer-events-none select-none"
+        style={{ width: compact ? 90 : 130, height: compact ? 110 : 150 }}
+      />
+    );
+  }
+
+  const turnStartTime = room?.turn?.action_start_time || room?.turn?.turn_start_time;
+  const isPowerPending = room?.turn?.pending_action && ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(room.turn.pending_action);
+  const maxTimerSeconds = isPowerPending ? 10 : 8;
+
   return (
     <div
-      className={`glass-panel flex flex-col items-center ${compact ? "gap-0.5" : "gap-1"} rounded-xl ${pad} transition-all ${
+      className={`glass-panel relative flex flex-col items-center ${compact ? "gap-0.5" : "gap-1"} rounded-xl ${pad} transition-all ${
         isTurn ? "animate-turn-pulse border border-amber-400/60" : "border border-transparent"
       } ${isDisconnected ? "opacity-50" : ""}`}
     >
+      {isTurn && (
+        <EightSegmentGlowBorder startTime={turnStartTime || Date.now() / 1000} maxSeconds={maxTimerSeconds} />
+      )}
       {displayItems.length === 0 ? (
         <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-center shadow-lg">
           <p className="text-[8px] sm:text-[9px] font-extrabold text-amber-400 uppercase tracking-wider animate-pulse">
@@ -306,19 +403,48 @@ function Hand({
           {displayItems.map(({ card: c, origIndex: i }) => {
             if (c === null) {
               // Render an empty dashed slot matching exact card dimensions
-              const DIMS: Record<string, { w: number; h: number }> = compact
-                ? { sm: { w: 40, h: 56 }, md: { w: 56, h: 78 }, lg: { w: 68, h: 96 } }
-                : { sm: { w: 56, h: 78 }, md: { w: 80, h: 112 }, lg: { w: 96, h: 134 } };
-              const d = DIMS[cardSize] ?? DIMS.md;
+              const CARD_DIMS: Record<string, { w: number; h: number }> = compact
+                ? {
+                    xs: { w: 32, h: 46 },
+                    sm: { w: 38, h: 54 },
+                    md: { w: 50, h: 70 },
+                    lg: { w: 62, h: 88 },
+                  }
+                : {
+                    xs: { w: 38, h: 54 },
+                    sm: { w: 50, h: 70 },
+                    md: { w: 72, h: 100 },
+                    lg: { w: 88, h: 124 },
+                  };
+              const d = CARD_DIMS[cardSize] ?? CARD_DIMS.md;
+
+              const BADGE_DIMS: Record<string, { sizeClass: string; fontClass: string }> = compact
+                ? {
+                    xs: { sizeClass: "w-2.5 h-2.5", fontClass: "text-[5.5px]" },
+                    sm: { sizeClass: "w-3 h-3", fontClass: "text-[6.5px]" },
+                    md: { sizeClass: "w-3.5 h-3.5", fontClass: "text-[7.5px]" },
+                    lg: { sizeClass: "w-4 h-4", fontClass: "text-[8.5px]" },
+                  }
+                : {
+                    xs: { sizeClass: "w-3 h-3", fontClass: "text-[6.5px]" },
+                    sm: { sizeClass: "w-3.5 h-3.5", fontClass: "text-[7.5px]" },
+                    md: { sizeClass: "w-4 h-4", fontClass: "text-[8.5px]" },
+                    lg: { sizeClass: "w-4.5 h-4.5", fontClass: "text-[9.5px]" },
+                  };
+              const badge = BADGE_DIMS[cardSize] ?? BADGE_DIMS.md;
 
               return (
                 <div
                   key={`empty-${i}`}
-                  className="border-2 border-dashed border-slate-600/30 rounded-xl relative flex items-center justify-center opacity-50"
+                  className="border border-dashed border-slate-600/40 bg-slate-950/30 rounded-xl relative flex items-center justify-center opacity-60"
                   style={{ width: d.w, height: d.h, borderRadius: compact ? 5 : 10 }}
                 >
-                  <span className="text-slate-500 font-bold text-[9px] uppercase tracking-widest">Empty</span>
-                  <div className={`absolute -top-1 -right-1 bg-slate-800/80 text-slate-400 font-bold rounded-full ${compact ? "w-2.5 h-2.5 text-[5.5px]" : "w-3.5 h-3.5 text-[7.5px]"} flex items-center justify-center border border-white/5`}>
+                  <span className={`${compact ? "text-[7px]" : "text-[9px]"} text-slate-500 font-bold uppercase tracking-widest`}>
+                    Empty
+                  </span>
+                  <div
+                    className={`absolute -top-1 -right-1 bg-slate-900/90 text-slate-400 font-bold rounded-full ${badge.sizeClass} ${badge.fontClass} flex items-center justify-center border border-white/10`}
+                  >
                     {i + 1}
                   </div>
                 </div>
@@ -445,7 +571,7 @@ function NextRoundButton({
           : "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 animate-bounce"
       }`}
     >
-      {isReady ? "✓ Ready (Cancel)" : "Ready Up for Next Round!"}
+      {isReady ? "✓ Cancel" : "Ready Up for Next Round!"}
     </button>
   );
 }
@@ -490,12 +616,13 @@ function EndGameButton({ onClick }: { onClick: () => void }) {
 
 function CaboRoundBanner() {
   return (
-    <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-      <div className="glass-panel px-4 py-1 rounded-full border border-amber-500/60 bg-amber-950/40 animate-pulse">
-        <p className="text-center text-[10px] sm:text-xs font-bold uppercase tracking-widest text-amber-400">
-          Cabo Called! Final Round In Progress
-        </p>
-      </div>
+    <div className="glass-panel px-3.5 py-2 rounded-2xl border border-amber-500/60 bg-amber-950/95 shadow-2xl backdrop-blur animate-pulse pointer-events-none text-center">
+      <p className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-amber-400 leading-tight">
+        ⚡ Cabo Called!
+      </p>
+      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-200/90 mt-0.5">
+        Final Round In Progress
+      </p>
     </div>
   );
 }
@@ -505,12 +632,13 @@ function GameOverBanner({ room }: { room: ApiRoomState }) {
   const winner = sortedPlayers[0];
 
   return (
-    <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3">
-      <div className="glass-panel px-4 py-1.5 rounded-full border border-amber-500/60 bg-amber-950/40 shadow-lg flex items-center gap-2">
-        <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-amber-400">
-          Round {room.round_number ?? 1} Finished! Leader: {winner ? `${winner.name} (${winner.score} pts)` : "N/A"}
-        </span>
-      </div>
+    <div className="glass-panel px-3.5 py-2 rounded-2xl border border-amber-500/60 bg-amber-950/95 shadow-2xl backdrop-blur flex flex-col items-center pointer-events-none text-center">
+      <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-amber-400">
+        🏆 Round {room.round_number ?? 1} Finished!
+      </span>
+      <span className="text-[9px] sm:text-[10px] font-bold text-slate-200 mt-0.5">
+        Leader: {winner ? `${winner.name} (${winner.score} pts)` : "N/A"}
+      </span>
     </div>
   );
 }
@@ -532,7 +660,7 @@ function ScorecardModal({
   const myName = getRememberedPlayer(room.room_id)?.name ?? null;
   const me = room.players.find((p) => (myId && String(p.id).toLowerCase() === String(myId).toLowerCase()) || (myName && p.name.trim().toLowerCase() === myName.trim().toLowerCase())) || null;
   const isAdmin = me?.is_admin ?? false;
-  const nonAdmins = room.players.filter((p) => !p.is_admin);
+  const nonAdmins = room.players.filter((p) => !p.is_admin && !p.has_left && (p as any).is_connected !== false);
   const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
 
   return (
@@ -660,7 +788,7 @@ function ScorecardModal({
                     : "bg-amber-600 text-slate-950 shadow-lg shadow-amber-900/40 hover:bg-amber-500 animate-bounce"
                 }`}
               >
-                {me?.is_ready ? "✓ Ready for Next Round (Cancel)" : "Ready Up for Next Round!"}
+                {me?.is_ready ? "✓ Cancel" : "Ready Up for Next Round!"}
               </button>
             )}
           </div>
@@ -805,8 +933,11 @@ function getDynamicSeatStyle(seatId: SeatId, cardCount: number, isMobile: boolea
 
 function TableWatermark() {
   return (
-    <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-      <span className="text-[28vw] sm:text-[32vw] md:text-[380px] font-black tracking-[0.15em] text-gold-metallic opacity-[0.06] uppercase font-logo drop-shadow-2xl pl-[0.15em] leading-none text-center whitespace-nowrap">
+    <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none select-none overflow-hidden px-4">
+      <span
+        className="text-[18vw] sm:text-[22vw] md:text-[240px] font-black tracking-[0.08em] text-gold-metallic opacity-[0.05] uppercase font-logo drop-shadow-2xl leading-none text-center whitespace-nowrap max-w-full"
+        style={{ fontFamily: "'Cinzel Decorative', serif" }}
+      >
         CABO
       </span>
     </div>
@@ -838,8 +969,10 @@ function MobileLayout({
 }) {
   const seatedOpponents = calculateSeatedOpponents(room, myId);
   const isAdmin = me?.is_admin ?? false;
-  const nonAdmins = room.players.filter((p) => !p.is_admin);
+  const nonAdmins = room.players.filter((p) => !p.is_admin && !p.has_left && (p as any).is_connected !== false);
   const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
+  const isMyTurn = myId !== null && myId === currentTurnId;
+  const pendingAction = room.turn.pending_action;
 
   return (
     <main className="relative z-10 w-full h-[100dvh] overflow-hidden">
@@ -899,6 +1032,7 @@ function MobileLayout({
               onCardClick={(cardId) => handleCardClick(cardId, false)}
               isFinished={room.phase === "finished"}
               glowingCards={glowingCards}
+              room={room}
             />
           </div>
         );
@@ -925,22 +1059,67 @@ function MobileLayout({
               </div>
             )}
 
-            {/* Discard */}
-            <div className="flex flex-col items-center gap-0.5">
-              {discardTop ? (
-                <CardView card={discardTop} size="sm" compact clickable={actions.canDraw && room.discard_pile.length > 0} onClick={actions.onDrawDiscard} isGlowing={glowingCards[discardTop.id]} />
-              ) : (
-                <div
-                  className="flex items-center justify-center border border-dashed border-slate-600/60 text-[6px] font-bold uppercase text-slate-500 rounded-lg"
-                  style={{ width: 38, height: 54 }}
-                >
-                  Empty
+            {/* Discard Pile or Power Skip Button */}
+            {(() => {
+              const isPowerStartedInMiddle = (
+                (pendingAction === "blind_swap" && Boolean(room.turn.first_swap_target))
+              );
+              const isMyTurnPowerActive = isMyTurn && ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pendingAction);
+              const canShowSkipButton = isMyTurnPowerActive && (!isPowerStartedInMiddle || (pendingAction as string) === "look_and_swap");
+
+              return (
+                <div className="flex flex-col items-center gap-0.5 relative">
+                  {canShowSkipButton ? (
+                    <div
+                      className="flex flex-col items-center justify-center gap-1 p-1 rounded-xl bg-purple-950/95 border border-purple-400 shadow-lg shadow-purple-950/80 animate-pulse"
+                      style={{ width: 38, height: 54 }}
+                    >
+                      <button
+                        onClick={actions.onSkipPower}
+                        className="w-full py-1 rounded btn-gold-metallic text-[6px] font-black uppercase tracking-wider shadow active:scale-95 transition cursor-pointer text-center leading-none"
+                        title="Skip power action"
+                      >
+                        {pendingAction === "look_and_swap" && room.turn.first_swap_target ? "Keep" : "Skip"}
+                      </button>
+                    </div>
+                  ) : isPowerStartedInMiddle ? (
+                    <div
+                      className="flex flex-col items-center justify-center gap-0.5 p-0.5 rounded-xl bg-amber-950/90 border border-amber-500 shadow-lg animate-pulse text-center"
+                      style={{ width: 38, height: 54 }}
+                    >
+                      <span className="text-[10px]">🔄</span>
+                      <span className="text-[5px] font-black uppercase text-amber-300 tracking-tighter leading-none">
+                        Pick 2nd
+                      </span>
+                    </div>
+                  ) : discardTop ? (
+                    <CardView
+                      card={discardTop}
+                      size="sm"
+                      compact
+                      clickable={actions.canDraw && room.discard_pile.length > 0}
+                      onClick={actions.onDrawDiscard}
+                      isGlowing={glowingCards[discardTop.id]}
+                    />
+                  ) : (
+                    <div
+                      onClick={() => {
+                        if (actions.canDraw && room.discard_pile.length === 0) {
+                          toast.error("Discard pile is empty!");
+                        }
+                      }}
+                      className="flex items-center justify-center border border-dashed border-slate-600/60 text-[6px] font-bold uppercase text-slate-500 rounded-lg cursor-not-allowed"
+                      style={{ width: 38, height: 54 }}
+                    >
+                      Empty
+                    </div>
+                  )}
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-slate-300">
+                    {canShowSkipButton ? "Skip" : isPowerStartedInMiddle ? "Swap" : `Discard · ${room.discard_pile.length}`}
+                  </span>
                 </div>
-              )}
-              <span className="text-[7px] font-bold uppercase tracking-wider text-slate-300">
-                Discard
-              </span>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -961,9 +1140,15 @@ function MobileLayout({
             onCardClick={(cardId) => handleCardClick(cardId, true)}
             isFinished={room.phase === "finished"}
             glowingCards={glowingCards}
+            room={room}
           />
-          {actions.canDiscard && (
+          {actions.canDiscard && room.turn.drawn_from !== "discard" && (
             <DiscardButton onClick={actions.onDiscardPicked} compact />
+          )}
+          {actions.canDiscard && room.turn.drawn_from === "discard" && (
+            <div className="mb-2 bg-amber-950/90 text-amber-300 px-2 py-1 rounded-xl border border-amber-500/50 text-[8px] font-extrabold uppercase tracking-wider shadow animate-bounce">
+              Swap card!
+            </div>
           )}
         </div>
       )}
@@ -998,8 +1183,10 @@ function DesktopLayout({
 }) {
   const seatedOpponents = calculateSeatedOpponents(room, myId);
   const isAdmin = me?.is_admin ?? false;
-  const nonAdmins = room.players.filter((p) => !p.is_admin);
+  const nonAdmins = room.players.filter((p) => !p.is_admin && !p.has_left && (p as any).is_connected !== false);
   const allNonAdminsReady = nonAdmins.length > 0 ? nonAdmins.every((p) => p.is_ready) : true;
+  const isMyTurn = myId !== null && myId === currentTurnId;
+  const pendingAction = room.turn.pending_action;
 
   return (
     <main className="relative z-10 w-full h-[100dvh] overflow-hidden flex justify-center">
@@ -1059,6 +1246,7 @@ function DesktopLayout({
                 onCardClick={(cardId) => handleCardClick(cardId, false)}
                 isFinished={room.phase === "finished"}
                 glowingCards={glowingCards}
+                room={room}
               />
             </div>
           );
@@ -1085,22 +1273,69 @@ function DesktopLayout({
                 </div>
               )}
 
-              {/* Discard */}
-              <div className="flex flex-col items-center gap-1.5">
-                {discardTop ? (
-                  <CardView card={discardTop} size="md" clickable={actions.canDraw && room.discard_pile.length > 0} onClick={actions.onDrawDiscard} isGlowing={glowingCards[discardTop.id]} />
-                ) : (
-                  <div
-                    className="flex items-center justify-center border-2 border-dashed border-slate-600/60 text-[9px] uppercase font-bold text-slate-500 rounded-xl"
-                    style={{ width: 80, height: 112 }}
-                  >
-                    Empty
+              {/* Discard Pile or Power Skip Button */}
+              {(() => {
+                const isPowerStartedInMiddle = (
+                  (pendingAction === "blind_swap" && Boolean(room.turn.first_swap_target))
+                );
+                const isMyTurnPowerActive = isMyTurn && ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pendingAction);
+                const canShowSkipButton = isMyTurnPowerActive && (!isPowerStartedInMiddle || (pendingAction as string) === "look_and_swap");
+
+                return (
+                  <div className="flex flex-col items-center gap-1.5 relative">
+                    {canShowSkipButton ? (
+                      <div
+                        className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-purple-950/95 border-2 border-purple-400 shadow-2xl shadow-purple-950/80 animate-pulse"
+                        style={{ width: 85, height: 120 }}
+                      >
+                        <span className="text-xl">⚡</span>
+                        <button
+                          onClick={actions.onSkipPower}
+                          className="w-full py-1.5 px-1 rounded-xl btn-gold-metallic text-[10px] font-extrabold uppercase tracking-wider shadow hover:scale-105 active:scale-95 transition cursor-pointer text-center leading-tight"
+                          title="Skip power action"
+                        >
+                          {pendingAction === "look_and_swap" && room.turn.first_swap_target
+                            ? "🛡️ Keep Cards"
+                            : "⏩ Skip Power"}
+                        </button>
+                      </div>
+                    ) : isPowerStartedInMiddle ? (
+                      <div
+                        className="flex flex-col items-center justify-center gap-1.5 p-2 rounded-2xl bg-amber-950/90 border-2 border-amber-500 shadow-2xl shadow-amber-950/80 animate-pulse text-center"
+                        style={{ width: 85, height: 120 }}
+                      >
+                        <span className="text-xl">🔄</span>
+                        <span className="text-[9px] font-extrabold uppercase text-amber-300 tracking-wider leading-tight">
+                          Select 2nd Card
+                        </span>
+                      </div>
+                    ) : discardTop ? (
+                      <CardView
+                        card={discardTop}
+                        size="md"
+                        clickable={actions.canDraw && room.discard_pile.length > 0}
+                        onClick={actions.onDrawDiscard}
+                        isGlowing={glowingCards[discardTop.id]}
+                      />
+                    ) : (
+                      <div
+                        onClick={() => {
+                          if (actions.canDraw && room.discard_pile.length === 0) {
+                            toast.error("Discard pile is empty!");
+                          }
+                        }}
+                        className="flex items-center justify-center border-2 border-dashed border-slate-600/60 text-[9px] uppercase font-bold text-slate-500 rounded-xl cursor-not-allowed"
+                        style={{ width: 80, height: 112 }}
+                      >
+                        Empty
+                      </div>
+                    )}
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300">
+                      {canShowSkipButton ? "Skip Power" : isPowerStartedInMiddle ? "Swapping" : `Discard · ${room.discard_pile.length}`}
+                    </span>
                   </div>
-                )}
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300">
-                  Discard
-                </span>
-              </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -1119,9 +1354,15 @@ function DesktopLayout({
               onCardClick={(cardId) => handleCardClick(cardId, true)}
               isFinished={room.phase === "finished"}
               glowingCards={glowingCards}
+              room={room}
             />
-            {actions.canDiscard && (
+            {actions.canDiscard && room.turn.drawn_from !== "discard" && (
               <DiscardButton onClick={actions.onDiscardPicked} />
+            )}
+            {actions.canDiscard && room.turn.drawn_from === "discard" && (
+              <div className="mb-4 bg-amber-950/90 text-amber-300 px-3 py-2 rounded-2xl border border-amber-500/50 text-[10px] font-extrabold uppercase tracking-wider shadow-lg animate-bounce">
+                Swap with a card in your hand!
+              </div>
             )}
           </div>
         )}
@@ -1168,7 +1409,7 @@ function ActionToast({ log }: { log?: string }) {
   useEffect(() => {
     if (log) {
       setVisibleLog(log);
-      const t = setTimeout(() => setVisibleLog(null), 3000);
+      const t = setTimeout(() => setVisibleLog(null), 4000);
       return () => clearTimeout(t);
     }
   }, [log]);
@@ -1176,10 +1417,8 @@ function ActionToast({ log }: { log?: string }) {
   if (!visibleLog) return null;
 
   return (
-    <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-4 w-full max-w-sm">
-      <div className="bg-slate-900/95 backdrop-blur text-white px-4 py-3 rounded-2xl shadow-2xl shadow-black/50 border border-amber-500/30 text-center text-sm font-medium animate-pulse">
-        {visibleLog}
-      </div>
+    <div className="glass-panel bg-[#0d1528]/95 backdrop-blur text-amber-300 px-3.5 py-2.5 rounded-2xl shadow-2xl border border-amber-500/50 text-center text-xs font-bold tracking-wide uppercase leading-snug animate-pulse">
+      📢 {visibleLog}
     </div>
   );
 }
@@ -1188,16 +1427,14 @@ function WarningToast({ message, onClose }: { message: string | null; onClose: (
   if (!message) return null;
 
   return (
-    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[60] px-4 w-full max-w-sm">
-      <div className="bg-rose-950/95 backdrop-blur text-rose-200 px-4 py-3 rounded-2xl shadow-2xl shadow-rose-950/80 border border-rose-500/50 text-center text-xs sm:text-sm font-bold animate-bounce flex items-center justify-between gap-2">
-        <span>{message}</span>
-        <button
-          onClick={onClose}
-          className="text-rose-400 hover:text-white text-xs font-black px-1.5 py-0.5 rounded bg-rose-900/50 border border-rose-500/30"
-        >
-          ✕
-        </button>
-      </div>
+    <div className="glass-panel bg-rose-950/95 backdrop-blur text-rose-200 p-3 rounded-2xl shadow-2xl shadow-rose-950/80 border border-rose-500/60 flex items-center justify-between gap-2 animate-bounce pointer-events-auto">
+      <span className="text-xs font-bold leading-tight">{message}</span>
+      <button
+        onClick={onClose}
+        className="text-rose-400 hover:text-white text-xs font-black px-1.5 py-0.5 rounded bg-rose-900/60 border border-rose-500/40 shrink-0 cursor-pointer"
+      >
+        ✕
+      </button>
     </div>
   );
 }
@@ -1257,42 +1494,44 @@ function PeekingBanner({ peekEndTime }: { peekEndTime?: number | null }) {
 
 /* ─────────────────────────── Power Banner ─────────────────────────── */
 
-function PowerBanner({ room, myId, powerTargets, onSkip }: { room: ApiRoomState; myId: string | null; powerTargets: string[]; onSkip: () => void }) {
-    if (!myId || room.current_turn !== room.players.findIndex(p => p.id === myId)) return null;
-    const pa = room.turn.pending_action;
-    if (!["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pa)) return null;
+function PowerBanner({ room, myId, powerTargets }: { room: ApiRoomState; myId: string | null; powerTargets: string[] }) {
+  const currentTurnPlayer = room.players[room.current_turn];
+  const isMyTurn = myId !== null && currentTurnPlayer?.id === myId;
+  const pa = room.turn.pending_action;
+  const isPower = ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(pa);
 
-    let msg = "";
-    let skipBtnText = "⏩ Skip Power";
+  if (!isPower) return null;
+
+  let msg = "";
+  if (isMyTurn) {
     if (pa === "look_self") msg = "POWER (7/8): Peek at one of your own cards!";
     else if (pa === "look_other") msg = "POWER (9/10): Peek at one opponent's card!";
     else if (pa === "discard_self") msg = "POWER (K): Select one of your cards to trash!";
     else if (pa === "blind_swap") {
-        if (powerTargets.length === 0) msg = "POWER (J): Select a card (yours or opponent's) to swap!";
-        else msg = "POWER (J): Select the second card to swap with!";
+      if (powerTargets.length === 0) msg = "POWER (J): Select 1st card to swap!";
+      else msg = "POWER (J): Select 2nd card to swap!";
     }
     else if (pa === "look_and_swap") {
-        if (!room.turn.first_swap_target) {
-            msg = "POWER (Q): Select a card to peek at!";
-        } else {
-            msg = "POWER (Q): Peeked! Select second card to swap, or keep cards.";
-            skipBtnText = "🛡️ Keep Cards (Skip Swap)";
-        }
+      if (!room.turn.first_swap_target) msg = "POWER (Q): Select a card to peek at!";
+      else msg = "POWER (Q): Peeked! Select 2nd card to swap, or keep cards.";
     }
+  } else {
+    msg = `${currentTurnPlayer?.name || "Player"} is using a card power...`;
+  }
 
-    return (
-    <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 px-4 w-full max-w-sm flex flex-col items-center gap-1.5">
-      <div className="bg-purple-900/90 backdrop-blur text-white px-4 py-2.5 rounded-2xl shadow-2xl shadow-purple-900/50 border border-purple-400 text-center text-sm font-bold animate-pulse">
-        {msg}
+  return (
+    <div className="glass-panel bg-purple-950/95 backdrop-blur text-purple-200 p-3 rounded-2xl border border-purple-400/60 shadow-2xl shadow-purple-950/80 flex items-start gap-2.5 animate-fade-in">
+      <span className="text-xl shrink-0">✨</span>
+      <div>
+        <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-300">
+          Power Action
+        </p>
+        <p className="text-[11px] sm:text-xs font-semibold text-slate-100 leading-snug mt-0.5">
+          {msg}
+        </p>
       </div>
-      <button
-        onClick={onSkip}
-        className="glass-panel bg-purple-950/80 hover:bg-purple-900 text-purple-200 text-xs font-semibold px-3 py-1 rounded-xl border border-purple-400/50 shadow hover:scale-105 active:scale-95 transition-all pointer-events-auto cursor-pointer"
-      >
-        {skipBtnText}
-      </button>
     </div>
-    );
+  );
 }
 
 /* ─────────────────────────── Game Engine ─────────────────────────── */
@@ -1608,6 +1847,16 @@ function GameTable() {
       setBusy(false);
     },
 
+    onSkipPower: async () => {
+      if (!id || !myId || busy) return;
+      setBusy(true);
+      setPowerTargets([]);
+      try {
+        await endTurn(id, myId);
+      } catch (e) { console.error("Skip power failed", e); }
+      setBusy(false);
+    },
+
     onStartNextRound: async () => {
       if (!id || busy) return;
       setBusy(true);
@@ -1763,24 +2012,18 @@ function GameTable() {
 
   return (
     <>
-      <ActionToast log={room.last_action_log} />
-      <WarningToast message={stickyWarning} onClose={() => setStickyWarning(null)} />
-      <PeekingBanner peekEndTime={room.peek_end_time} />
-      <PowerBanner room={room} myId={myId} powerTargets={powerTargets} onSkip={async () => {
-        if (!id || !myId || busy) return;
-        setBusy(true);
-        setPowerTargets([]);
-        try {
-          await endTurn(id, myId);
-        } catch (e) { console.error("Skip power failed", e); }
-        setBusy(false);
-      }} />
-      {room.active_resolutions?.length > 0 && (
-        <StickyResolutionBanner resolution={room.active_resolutions[0]} players={room.players} myId={myId} />
-      )}
-      {room.phase === "peeking" && <PeekTimer endTime={room.peek_end_time} />}
-      {room.phase === "cabo_round" && <CaboRoundBanner />}
-      {room.phase === "finished" && <GameOverBanner room={room} />}
+      {/* Bottom-Left Notification Box (Left side of user cards) */}
+      <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-8 z-40 flex flex-col gap-2 max-w-[210px] sm:max-w-[270px] pointer-events-none">
+        <WarningToast message={stickyWarning} onClose={() => setStickyWarning(null)} />
+        <PowerBanner room={room} myId={myId} powerTargets={powerTargets} />
+        <ActionToast log={room.last_action_log} />
+      </div>
+
+      {/* Bottom-Right Status Box (Right side of user cards) */}
+      <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-8 z-40 flex flex-col gap-2 max-w-[210px] sm:max-w-[270px] pointer-events-none">
+        {room.phase === "cabo_round" && <CaboRoundBanner />}
+        {room.phase === "finished" && <GameOverBanner room={room} />}
+      </div>
       {showScorecard && <ScorecardModal room={room} myId={myId} actions={actions} onClose={() => setShowScorecard(false)} />}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       {/* Choice Modal for non-participants joining mid-game */}
