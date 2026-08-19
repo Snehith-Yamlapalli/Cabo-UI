@@ -81,34 +81,9 @@ export default function Home() {
         router.push(`/Room?id=${encodeURIComponent(code)}`);
       }
     } catch (err: any) {
-      const msg = (err?.message || "").toLowerCase();
-      if (msg.includes("full")) {
-        toast.error(`Room ${code} is full!`);
-        return;
-      }
-      if (msg.includes("already in this room") || msg.includes("already taken") || msg.includes("name")) {
-        const newName = window.prompt(`The name "${name}" is already taken in Room ${code}.\nPlease enter a different name:`);
-        if (newName?.trim()) {
-          const cleanNew = newName.trim();
-          setStoredName(cleanNew);
-          setPlayerName(cleanNew);
-          try {
-            await joinRoom({ room_id: code, player_name: cleanNew });
-            rememberPlayer(code, { name: cleanNew, admin: false });
-            const room = await getRoom(code);
-            if (room && room.phase !== "lobby") {
-              router.push(`/Game?id=${encodeURIComponent(code)}`);
-            } else {
-              router.push(`/Room?id=${encodeURIComponent(code)}`);
-            }
-            return;
-          } catch (retryErr: any) {
-            toast.error(retryErr.message || "Failed to join room.");
-          }
-        }
-        return;
-      }
-      toast.error(err?.message || `Room ${code} has been closed or does not exist`);
+      const msg = err?.message || "Failed to join room";
+      toast.error(msg);
+      setNameReady(false);
     }
   }
 
