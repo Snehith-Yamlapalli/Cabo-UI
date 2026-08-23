@@ -88,17 +88,17 @@ export default function Home() {
   }
 
   return (
-    <main className="relative flex min-h-full w-full flex-col items-center justify-center px-4 py-6 sm:py-10 my-auto">
+    <main className="relative flex min-h-full w-full flex-col items-center justify-start sm:justify-center px-3 py-4 sm:py-8">
       <DecoCards />
 
       {/* Main card */}
       <div
-        className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-5 sm:p-8 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl animate-card-deal"
+        className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-4 sm:p-7 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl animate-card-deal"
       >
         {/* Brand header */}
-        <div className="mb-4 sm:mb-8 text-center">
-          <div className="mx-auto mb-2 sm:mb-4 flex h-14 sm:h-20 w-20 sm:w-28 items-center justify-center rounded-2xl border border-amber-500/30 bg-[#112240]/90 shadow-lg">
-            <div className="text-xl sm:text-3xl leading-none flex items-center gap-1.5">
+        <div className="mb-3 sm:mb-6 text-center">
+          <div className="mx-auto mb-2 sm:mb-4 flex h-12 sm:h-16 w-16 sm:w-24 items-center justify-center rounded-2xl border border-amber-500/30 bg-[#112240]/90 shadow-lg">
+            <div className="text-lg sm:text-2xl leading-none flex items-center gap-1.5">
               <span className="text-amber-400">♠</span>
               <span className="text-amber-400">♣</span>
               <span className="text-amber-400">♥</span>
@@ -106,12 +106,12 @@ export default function Home() {
             </div>
           </div>
           <h1
-            className="text-4xl sm:text-6xl font-black tracking-[0.18em] text-gold-metallic font-logo uppercase drop-shadow-lg py-1"
+            className="text-3xl sm:text-5xl font-black tracking-[0.18em] text-gold-metallic font-logo uppercase drop-shadow-lg py-0.5"
             style={{ fontFamily: "'Cinzel Decorative', serif" }}
           >
             CABO
           </h1>
-          <p className="mt-1 sm:mt-2 text-[10px] sm:text-xs font-medium text-slate-400 tracking-wide">
+          <p className="mt-1 text-[9px] sm:text-xs font-medium text-slate-400 tracking-wide">
             Memory, tactics & rapid card swaps
           </p>
         </div>
@@ -130,49 +130,49 @@ export default function Home() {
               onChange={(e) => setPlayerName(e.target.value.slice(0, 10))}
               onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
               placeholder="Enter your name (max 10 chars)"
-              className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3.5 text-center text-sm text-white placeholder:text-slate-600 placeholder:text-xs outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
+              className="w-full rounded-2xl border border-amber-500/30 bg-[#060e1a]/90 px-4 py-3 text-center text-xs sm:text-sm text-white placeholder:text-slate-600 placeholder:text-xs outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-500/30"
             />
             <button
               onClick={saveName}
               disabled={!playerName.trim()}
-              className="w-full rounded-2xl btn-gold-metallic px-5 py-3.5 text-xs sm:text-sm font-extrabold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-30"
+              className="w-full rounded-2xl btn-gold-metallic px-5 py-3 text-xs sm:text-sm font-extrabold uppercase tracking-wider transition-all disabled:cursor-not-allowed disabled:opacity-30"
             >
               Continue
             </button>
           </div>
         ) : (
           /* Step 2: Create / Join (name already set) */
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {/* Playing as Name Badge with Change Name action */}
-            <div className="glass-panel bg-[#0d1c33]/90 border border-amber-500/30 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xl">
+            <div className="glass-panel bg-[#0d1c33]/90 border border-amber-500/30 p-2.5 sm:p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-xl">
               <div className="flex flex-col text-left">
                 <span className="text-[9px] font-extrabold uppercase tracking-widest text-slate-400">
                   Playing as
                 </span>
-                <span className="text-base sm:text-lg font-black text-gold-metallic tracking-wide truncate max-w-[170px] sm:max-w-[210px]">
+                <span className="text-sm sm:text-base font-black text-gold-metallic tracking-wide truncate max-w-[150px] sm:max-w-[200px]">
                   {playerName}
                 </span>
               </div>
               <button
                 onClick={() => setNameReady(false)}
-                className="shrink-0 px-3.5 py-2 rounded-xl bg-[#112240] hover:bg-[#1a2f54] border border-amber-500/30 text-amber-200 hover:text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 shadow cursor-pointer"
+                className="shrink-0 px-3 py-1.5 sm:py-2 rounded-xl bg-[#112240] hover:bg-[#1a2f54] border border-amber-500/30 text-amber-200 hover:text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1 shadow cursor-pointer"
                 title="Change Name"
               >
                 <span>Change</span>
-                <span className="text-[11px]">✏️</span>
+                <span className="text-[10px]">✏️</span>
               </button>
             </div>
 
             <button
               onClick={() => setShowCreate(true)}
-              className="w-full rounded-2xl btn-gold-metallic px-5 py-3.5 sm:py-4 text-xs sm:text-sm font-extrabold uppercase tracking-wider transition-all"
+              className="w-full rounded-2xl btn-gold-metallic px-5 py-3 sm:py-3.5 text-xs sm:text-sm font-extrabold uppercase tracking-wider transition-all"
             >
               Create a Room
             </button>
 
-            <div className="flex items-center gap-3 py-1">
+            <div className="flex items-center gap-3 py-0.5">
               <span className="h-px flex-1 bg-slate-800" />
-              <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-600">
+              <span className="text-[9px] sm:text-xs font-bold uppercase tracking-widest text-slate-600">
                 or join room
               </span>
               <span className="h-px flex-1 bg-slate-800" />

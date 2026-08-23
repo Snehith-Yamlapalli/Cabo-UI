@@ -258,7 +258,7 @@ function RoomView() {
   }
 
   return (
-    <main className="relative flex min-h-full w-full flex-col items-center justify-center px-4 py-6 sm:py-10 my-auto">
+    <main className="relative flex min-h-full w-full flex-col items-center justify-start sm:justify-center px-3 py-4 sm:py-8">
       <DecoCards />
 
       {/* 3-2-1 Countdown Overlay */}
@@ -273,7 +273,7 @@ function RoomView() {
         </div>
       )}
 
-      <div className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-5 sm:p-8 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+      <div className="relative z-10 w-full max-w-sm rounded-3xl gold-card-border bg-[#0a162b]/95 p-4 sm:p-7 my-auto shadow-[0_12px_60px_rgba(0,0,0,0.7)] backdrop-blur-xl">
         {/* Top-Left Close/Leave Room Button (Red X) */}
         <button
           onClick={() => setShowEndGameModal(true)}

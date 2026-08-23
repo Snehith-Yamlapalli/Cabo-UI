@@ -487,7 +487,7 @@ function Hand({
           </span>
         )}
         {isCabo && (
-          <span className="shrink-0 rounded-full bg-amber-500/80 px-1 py-px text-[5px] uppercase tracking-wider text-white animate-glow-pulse">
+          <span className="shrink-0 rounded-full bg-amber-500/80 px-1.5 py-0.5 text-[6px] sm:text-[8px] font-extrabold uppercase tracking-wider text-white border border-amber-300/40 shadow shadow-amber-900/50 animate-glow-pulse">
             Cabo
           </span>
         )}
@@ -580,10 +580,13 @@ function ScorecardButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="glass-panel hover:bg-slate-800/80 text-amber-400 font-extrabold w-8 h-8 rounded-full flex items-center justify-center border border-amber-500/40 shadow-lg hover:scale-105 active:scale-95 transition-all text-xs"
-      title="Scorecard & Rules"
+      className="glass-panel bg-[#0d1c33]/90 hover:bg-[#142646] text-amber-300 hover:text-amber-200 font-extrabold px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-amber-500/40 shadow-lg hover:scale-105 active:scale-95 transition-all text-xs cursor-pointer"
+      title="View Match Standings & Card Values"
     >
-      (i)
+      <span className="text-xs sm:text-sm">📊</span>
+      <span className="font-extrabold tracking-wide uppercase text-[10px] sm:text-xs">
+        Scorecard
+      </span>
     </button>
   );
 }
@@ -955,6 +958,7 @@ function MobileLayout({
   handleCardClick,
   getCardClickable,
   glowingCards,
+  isCardsRevealed,
 }: {
   others: ApiPlayer[];
   me: ApiPlayer | null;
@@ -966,6 +970,7 @@ function MobileLayout({
   handleCardClick: (cardId: string, isMyCard: boolean) => void;
   getCardClickable: (isMyCard: boolean) => boolean;
   glowingCards: Record<string, boolean>;
+  isCardsRevealed: boolean;
 }) {
   const seatedOpponents = calculateSeatedOpponents(room, myId);
   const isAdmin = me?.is_admin ?? false;
@@ -1030,7 +1035,7 @@ function MobileLayout({
               layout="grid"
               cardsClickable={getCardClickable(false)}
               onCardClick={(cardId) => handleCardClick(cardId, false)}
-              isFinished={room.phase === "finished"}
+              isFinished={isCardsRevealed}
               glowingCards={glowingCards}
               room={room}
             />
@@ -1039,7 +1044,7 @@ function MobileLayout({
       })}
 
       {/* Center Zone Mat: Distinguished Grey Plate for Deck + Discard */}
-      {room.phase !== "finished" && (
+      {(room.phase !== "finished" || !isCardsRevealed) && (
         <div className="absolute top-[50%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-500">
           <div className="glass-panel bg-[#0d1528]/80 border border-amber-900/30 shadow-xl rounded-2xl p-1.5 flex items-center gap-4">
             {/* Deck */}
@@ -1138,7 +1143,7 @@ function MobileLayout({
             layout="grid"
             cardsClickable={getCardClickable(true)}
             onCardClick={(cardId) => handleCardClick(cardId, true)}
-            isFinished={room.phase === "finished"}
+            isFinished={isCardsRevealed}
             glowingCards={glowingCards}
             room={room}
           />
@@ -1169,6 +1174,7 @@ function DesktopLayout({
   handleCardClick,
   getCardClickable,
   glowingCards,
+  isCardsRevealed,
 }: {
   others: ApiPlayer[];
   me: ApiPlayer | null;
@@ -1180,6 +1186,7 @@ function DesktopLayout({
   handleCardClick: (cardId: string, isMyCard: boolean) => void;
   getCardClickable: (isMyCard: boolean) => boolean;
   glowingCards: Record<string, boolean>;
+  isCardsRevealed: boolean;
 }) {
   const seatedOpponents = calculateSeatedOpponents(room, myId);
   const isAdmin = me?.is_admin ?? false;
@@ -1244,7 +1251,7 @@ function DesktopLayout({
                 cardSize="md"
                 cardsClickable={getCardClickable(false)}
                 onCardClick={(cardId) => handleCardClick(cardId, false)}
-                isFinished={room.phase === "finished"}
+                isFinished={isCardsRevealed}
                 glowingCards={glowingCards}
                 room={room}
               />
@@ -1253,7 +1260,7 @@ function DesktopLayout({
         })}
 
         {/* Center Zone Mat: Distinguished Grey Plate for Deck + Discard */}
-        {room.phase !== "finished" && (
+        {(room.phase !== "finished" || !isCardsRevealed) && (
           <div className="absolute top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-all duration-500">
             <div className="glass-panel bg-[#0d1528]/85 border border-amber-900/30 shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-3xl px-6 py-3.5 flex items-center gap-8">
               {/* Deck */}
@@ -1352,7 +1359,7 @@ function DesktopLayout({
               cardSize="lg"
               cardsClickable={getCardClickable(true)}
               onCardClick={(cardId) => handleCardClick(cardId, true)}
-              isFinished={room.phase === "finished"}
+              isFinished={isCardsRevealed}
               glowingCards={glowingCards}
               room={room}
             />
@@ -1559,11 +1566,27 @@ function GameTable() {
   const [joinError, setJoinError] = useState("");
   const [isJoining, setIsJoining] = useState(false);
 
+  const [revealTimeLeft, setRevealTimeLeft] = useState<number | null>(null);
+
   useEffect(() => {
     if (room?.phase === "finished") {
-      setShowScorecard(true);
+      setShowScorecard(false);
+      setRevealTimeLeft(5);
+      const interval = setInterval(() => {
+        setRevealTimeLeft((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      setRevealTimeLeft(null);
     }
-  }, [room?.phase]);
+  }, [room?.phase, room?.round_number]);
 
   useEffect(() => {
     if (!id) return;
@@ -1917,9 +1940,9 @@ function GameTable() {
     const caboCallerId = caboCallerPlayer?.id;
     const cardOwnerId = getCardOwnerId(cardId);
 
-    // Freeze Cabo Caller's cards against other players' powers & sticky actions
-    if (caboCallerId && cardOwnerId === caboCallerId && myId !== caboCallerId) {
-      setStickyWarning("⚠️ Cards of the player who called CABO are frozen and protected!");
+    // Freeze Cabo Caller's cards against powers & sticky actions for EVERYONE (even the Cabo caller!)
+    if (caboCallerId && cardOwnerId && String(cardOwnerId).toLowerCase() === String(caboCallerId).toLowerCase()) {
+      setStickyWarning("❄️ Cards of the player who called CABO are frozen and locked until reveal!");
       setTimeout(() => setStickyWarning(null), 3500);
       return;
     }
@@ -1975,14 +1998,18 @@ function GameTable() {
       return;
     }
 
-    // 4. Sticky (Enabled during playing & cabo_round)
-    const canSticky = (room.phase === "playing" || room.phase === "cabo_round") && !activeRes && room.discard_pile.length > 0;
+    // 4. Sticky (Enabled during playing, cabo_round, or pre-reveal finished phase)
+    const canSticky = (room.phase === "playing" || room.phase === "cabo_round" || (room.phase === "finished" && !isCardsRevealed)) && !activeRes && room.discard_pile.length > 0;
     if (canSticky) {
       actions.onSticky(cardId);
     }
   };
 
   const getCardClickable = (isMyCard: boolean) => {
+    const caboCallerPlayer = room.players.find((p) => p.called_cabo);
+    const isMeCaboCaller = caboCallerPlayer && myId && String(caboCallerPlayer.id).toLowerCase() === String(myId).toLowerCase();
+    if (isMyCard && isMeCaboCaller) return false;
+
     const activeRes = room.active_resolutions?.[0];
     if (activeRes?.giver_id === myId) return isMyCard;
     if (actions.canDiscard) return isMyCard;
@@ -1996,7 +2023,7 @@ function GameTable() {
       if (pendingAction === "look_and_swap") return true;
     }
 
-    const canSticky = (room.phase === "playing" || room.phase === "cabo_round") && !activeRes && room.discard_pile.length > 0;
+    const canSticky = (room.phase === "playing" || room.phase === "cabo_round" || (room.phase === "finished" && !isCardsRevealed)) && !activeRes && room.discard_pile.length > 0;
     return canSticky;
   };
 
@@ -2008,12 +2035,18 @@ function GameTable() {
     combinedGlows[targetId] = true;
   }
 
-  const props = { others, me, room, myId, currentTurnId, discardTop, actions, handleCardClick, getCardClickable, glowingCards: combinedGlows };
+  const isCardsRevealed = room.phase === "finished" && (revealTimeLeft === 0 || revealTimeLeft === null);
+  const props = { others, me, room, myId, currentTurnId, discardTop, actions, handleCardClick, getCardClickable, glowingCards: combinedGlows, isCardsRevealed };
 
   return (
     <>
       {/* Bottom-Left Notification Box (Left side of user cards) */}
       <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-8 z-40 flex flex-col gap-2 max-w-[210px] sm:max-w-[270px] pointer-events-none">
+        {room.phase === "finished" && revealTimeLeft !== null && revealTimeLeft > 0 && (
+          <div className="glass-panel bg-amber-950/95 backdrop-blur text-amber-300 px-3.5 py-2.5 rounded-2xl shadow-2xl border border-amber-500/50 text-center text-xs font-extrabold tracking-wide uppercase leading-snug animate-pulse">
+            📢 Last {revealTimeLeft} sec to reveal cards
+          </div>
+        )}
         <WarningToast message={stickyWarning} onClose={() => setStickyWarning(null)} />
         <PowerBanner room={room} myId={myId} powerTargets={powerTargets} />
         <ActionToast log={room.last_action_log} />
