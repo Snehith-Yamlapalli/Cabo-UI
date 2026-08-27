@@ -554,10 +554,9 @@ function NextRoundButton({
     return (
       <button
         onClick={onStart}
-        disabled={!allNonAdminsReady}
-        className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse`}
+        className={`${compact ? "px-3 py-1 text-[8px]" : "px-4 py-2 text-xs"} font-extrabold uppercase tracking-wider rounded-full bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 active:scale-95 transition-all animate-pulse cursor-pointer`}
       >
-        {!allNonAdminsReady ? "Waiting for Players..." : "Start Next Round →"}
+        Start Next Round →
       </button>
     );
   }
@@ -777,10 +776,9 @@ function ScorecardModal({
             {isAdmin ? (
               <button
                 onClick={actions.onStartNextRound}
-                disabled={!allNonAdminsReady}
-                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-black uppercase tracking-wider text-xs shadow-lg shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-40 disabled:scale-100 disabled:shadow-none animate-pulse"
+                className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-black uppercase tracking-wider text-xs shadow-lg shadow-amber-500/30 hover:scale-[1.02] active:scale-95 transition-all animate-pulse cursor-pointer"
               >
-                {!allNonAdminsReady ? "Waiting for Players to Ready Up..." : "Start Next Round →"}
+                Start Next Round →
               </button>
             ) : (
               <button
