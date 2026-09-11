@@ -379,6 +379,9 @@ function Hand({
   const turnStartTime = room?.turn?.action_start_time || room?.turn?.turn_start_time;
   const isPowerPending = room?.turn?.pending_action && ["look_self", "look_other", "blind_swap", "look_and_swap", "discard_self"].includes(room.turn.pending_action);
   const maxTimerSeconds = isPowerPending ? 10 : 8;
+  // During "peeking" everyone is still memorising their cards, so nobody's turn
+  // clock has started yet — don't show a countdown for the starting player.
+  const showTurnTimer = isTurn && room?.phase !== "peeking" && !!turnStartTime;
 
   return (
     <div
@@ -386,8 +389,8 @@ function Hand({
         isTurn ? "animate-turn-pulse border border-amber-400/60" : "border border-transparent"
       } ${isDisconnected ? "opacity-50" : ""}`}
     >
-      {isTurn && (
-        <EightSegmentGlowBorder startTime={turnStartTime || Date.now() / 1000} maxSeconds={maxTimerSeconds} />
+      {showTurnTimer && (
+        <EightSegmentGlowBorder startTime={turnStartTime!} maxSeconds={maxTimerSeconds} />
       )}
       {displayItems.length === 0 ? (
         <div className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/60 text-center shadow-lg">
